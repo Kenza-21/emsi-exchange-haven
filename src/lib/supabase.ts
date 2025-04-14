@@ -18,10 +18,15 @@ if (isMissingConfig) {
   );
 }
 
-// Create Supabase client only when properly configured, otherwise create a mock client
-export const supabase = !isMissingConfig 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : createClient('https://example.supabase.co', 'fake-key');
+// Create a mock client for development when not configured
+export const supabase = isMissingConfig 
+  ? createClient('https://example.supabase.co', 'fake-key', {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : createClient(supabaseUrl, supabaseAnonKey);
 
 // Export a helper to check if Supabase is properly configured
 export const isSupabaseConfigured = !isMissingConfig;
