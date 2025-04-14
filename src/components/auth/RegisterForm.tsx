@@ -27,11 +27,6 @@ export function RegisterForm() {
       return;
     }
     
-    if (!email.endsWith('@emsi.edu')) {
-      setError("Registration is restricted to EMSI students with an EMSI email");
-      return;
-    }
-    
     setIsLoading(true);
     
     try {
@@ -71,12 +66,11 @@ export function RegisterForm() {
             <Input
               id="email"
               type="email"
-              placeholder="your.email@emsi.edu"
+              placeholder="your.email@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <p className="text-xs text-gray-500">You must use your EMSI email address</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="studentId">Student ID</Label>
