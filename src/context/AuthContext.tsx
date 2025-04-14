@@ -1,7 +1,6 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { toast } from '@/hooks/use-toast';
 
@@ -23,6 +22,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -43,6 +47,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, studentId: string) => {
+    if (!isSupabaseConfigured) {
+      toast({
+        title: "Supabase not configured",
+        description: "Please connect to Supabase using the green button in the top right corner.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       // Sign up the user
       const { data, error } = await supabase.auth.signUp({ email, password });
@@ -80,6 +93,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      toast({
+        title: "Supabase not configured",
+        description: "Please connect to Supabase using the green button in the top right corner.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       
@@ -102,6 +124,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    if (!isSupabaseConfigured) return;
+
     try {
       await supabase.auth.signOut();
       navigate('/login');

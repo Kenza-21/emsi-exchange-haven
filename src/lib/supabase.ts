@@ -18,8 +18,10 @@ if (isMissingConfig) {
   );
 }
 
-// Create Supabase client (will use empty strings during development if vars are missing)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create Supabase client only when properly configured, otherwise create a mock client
+export const supabase = !isMissingConfig 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : createClient('https://example.supabase.co', 'fake-key');
 
 // Export a helper to check if Supabase is properly configured
 export const isSupabaseConfigured = !isMissingConfig;
