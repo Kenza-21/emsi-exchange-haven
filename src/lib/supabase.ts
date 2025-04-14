@@ -1,19 +1,25 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Validate environment variables
-if (!import.meta.env.VITE_SUPABASE_URL) {
-  console.error('Supabase URL is missing. Please set VITE_SUPABASE_URL');
-  throw new Error('Supabase URL is required');
+// Get environment variables with fallbacks for development
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Check if we're missing configuration
+const isMissingConfig = !supabaseUrl || !supabaseAnonKey;
+
+// Log warning for developers
+if (isMissingConfig) {
+  console.warn(
+    'Supabase configuration is missing. Please set the following environment variables:\n' +
+    '- VITE_SUPABASE_URL\n' +
+    '- VITE_SUPABASE_ANON_KEY\n\n' +
+    'For Lovable projects, connect to Supabase using the green Supabase button in the top right corner.'
+  );
 }
 
-if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
-  console.error('Supabase Anon Key is missing. Please set VITE_SUPABASE_ANON_KEY');
-  throw new Error('Supabase Anon Key is required');
-}
-
-// Create a single supabase client for the entire app
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
+// Create Supabase client (will use empty strings during development if vars are missing)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Export a helper to check if Supabase is properly configured
+export const isSupabaseConfigured = !isMissingConfig;
