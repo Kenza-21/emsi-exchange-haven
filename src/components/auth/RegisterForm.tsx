@@ -1,11 +1,12 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { toast } from '@/hooks/use-toast';
 
 export function RegisterForm() {
   const [fullName, setFullName] = useState('');
@@ -17,6 +18,7 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   
   const { signUp } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,12 +29,19 @@ export function RegisterForm() {
       return;
     }
     
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
       await signUp(email, password, fullName, studentId);
-    } catch (error) {
-      console.error(error);
+      // Note: Navigation is now handled in the AuthContext after successful signup
+    } catch (error: any) {
+      console.error("Register form error:", error);
+      setError(error.message || "An error occurred during registration");
     } finally {
       setIsLoading(false);
     }
@@ -59,6 +68,7 @@ export function RegisterForm() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -70,6 +80,7 @@ export function RegisterForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -80,6 +91,7 @@ export function RegisterForm() {
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
               required
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -92,6 +104,7 @@ export function RegisterForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -104,6 +117,7 @@ export function RegisterForm() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={6}
+              disabled={isLoading}
             />
           </div>
           <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={isLoading}>

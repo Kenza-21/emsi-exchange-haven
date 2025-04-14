@@ -1,21 +1,21 @@
 
 export type Profile = {
   id: string;
-  full_name: string;
-  student_id: string;
+  full_name: string | null;
+  student_id: string | null;
   created_at: string;
 };
 
 export type Listing = {
   id: string;
   title: string;
-  description: string;
-  price: number;
+  description: string | null;
+  price: number | null;
   category: string;
   condition: string;
   user_id: string;
   created_at: string;
-  status: 'active' | 'sold' | 'reserved';
+  status: 'active' | 'sold' | 'reserved' | string;
 };
 
 export type Image = {
@@ -32,18 +32,18 @@ export type Message = {
   listing_id: string;
   content: string;
   created_at: string;
-  read: boolean;
+  read: boolean | null;
 };
 
 export type LostFound = {
   id: string;
   title: string;
-  description: string;
-  location: string;
+  description: string | null;
+  location: string | null;
   found_date: string;
   user_id: string;
-  image_url: string;
-  status: 'found' | 'claimed';
+  image_url: string | null;
+  status: 'found' | 'claimed' | string;
   created_at: string;
 };
 
