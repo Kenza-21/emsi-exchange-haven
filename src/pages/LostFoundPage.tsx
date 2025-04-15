@@ -1,23 +1,25 @@
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Plus, AlertCircle } from 'lucide-react';
+import { Search, Plus, AlertCircle, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { LostFound, Profile } from '@/types/database';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 const LostFoundPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [items, setItems] = useState<(LostFound & { user_profile?: Profile })[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch lost & found items
-  useState(() => {
+  useEffect(() => {
     const fetchItems = async () => {
       try {
         const { data, error } = await supabase
@@ -43,16 +45,52 @@ const LostFoundPage = () => {
     };
 
     fetchItems();
-  });
+  }, []);
 
   // Filter items based on search term
   const filteredItems = searchTerm
     ? items.filter(item => 
         item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchTerm.toLowerCase())
+        (item.description?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
+        (item.location?.toLowerCase().includes(searchTerm.toLowerCase()) || '')
       )
     : items;
+
+  const handleContact = (e: React.MouseEvent, item: LostFound & { user_profile?: Profile }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to contact the owner",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+
+    // Don't allow messaging yourself
+    if (user.id === item.user_id) {
+      toast({
+        title: "Cannot message yourself",
+        description: "This is your own lost & found item",
+      });
+      return;
+    }
+
+    // Navigate to messages with pre-selected user
+    navigate('/messages', { 
+      state: { 
+        contactUserId: item.user_id,
+        itemContext: {
+          type: 'lostfound',
+          id: item.id,
+          title: item.title
+        }
+      } 
+    });
+  };
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -94,8 +132,8 @@ const LostFoundPage = () => {
           </div>
         ) : (
           filteredItems.map(item => (
-            <Link key={item.id} to={`/lost-found/${item.id}`}>
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
+            <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
+              <Link to={`/lost-found/${item.id}`} className="flex-1">
                 <div className="h-48 bg-gray-200 relative">
                   {item.image_url ? (
                     <img 
@@ -116,10 +154,10 @@ const LostFoundPage = () => {
                     </div>
                   )}
                 </div>
-                <CardContent className="p-4">
+                <CardContent className="p-4 flex-1">
                   <h3 className="font-semibold text-gray-800 truncate">{item.title}</h3>
                   <p className="text-sm text-gray-500 mb-2">
-                    Found at: {item.location}
+                    Found at: {item.location || 'Unknown location'}
                   </p>
                   <div className="flex justify-between items-center mt-2">
                     <span className="text-xs text-gray-500">
@@ -130,8 +168,19 @@ const LostFoundPage = () => {
                     </span>
                   </div>
                 </CardContent>
-              </Card>
-            </Link>
+              </Link>
+              <div className="px-4 pb-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full flex items-center justify-center" 
+                  onClick={(e) => handleContact(e, item)}
+                  disabled={user?.id === item.user_id}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Contact
+                </Button>
+              </div>
+            </Card>
           ))
         )}
       </div>

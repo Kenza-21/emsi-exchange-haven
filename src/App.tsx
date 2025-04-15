@@ -15,6 +15,7 @@ import ListingPage from "./pages/ListingPage";
 import CreateListingPage from "./pages/CreateListingPage";
 import MessagesPage from "./pages/MessagesPage";
 import LostFoundPage from "./pages/LostFoundPage";
+import LostFoundDetailsPage from "./pages/LostFoundDetailsPage";
 import CreateLostFoundPage from "./pages/CreateLostFoundPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/create-listing" element={<CreateListingPage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/lost-found" element={<LostFoundPage />} />
+              <Route path="/lost-found/:id" element={<LostFoundDetailsPage />} />
               <Route path="/lost-found/create" element={<CreateLostFoundPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="*" element={<NotFound />} />

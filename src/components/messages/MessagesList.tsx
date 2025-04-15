@@ -1,22 +1,45 @@
 
 import { useState, useEffect } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { Message, Profile } from '@/types/database';
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface ConversationPartner extends Profile {
   lastMessage?: Message;
 }
 
+interface ItemContext {
+  type: 'listing' | 'lostfound';
+  id: string;
+  title: string;
+}
+
 export function MessagesList() {
   const { user } = useAuth();
+  const location = useLocation();
   const [conversations, setConversations] = useState<ConversationPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [itemContext, setItemContext] = useState<ItemContext | null>(null);
+
+  // Check if there's a user to contact from navigation state
+  useEffect(() => {
+    if (location.state?.contactUserId) {
+      setSelectedUser(location.state.contactUserId);
+    }
+    
+    if (location.state?.itemContext) {
+      setItemContext(location.state.itemContext);
+    }
+  }, [location.state]);
 
   // Fetch conversations
   useEffect(() => {
@@ -135,23 +158,97 @@ export function MessagesList() {
     if (!user || !selectedUser || !newMessage.trim()) return;
     
     try {
+      // Create message data with item context if available
+      const messageData: any = {
+        sender_id: user.id,
+        receiver_id: selectedUser,
+        content: newMessage.trim(),
+        read: false
+      };
+      
+      // Add item reference if we have context
+      if (itemContext) {
+        if (itemContext.type === 'listing') {
+          messageData.listing_id = itemContext.id;
+        } else if (itemContext.type === 'lostfound') {
+          messageData.lost_found_id = itemContext.id;
+        }
+        // Clear item context after first message
+        setItemContext(null);
+      }
+      
       const { error } = await supabase
         .from('messages')
-        .insert([{
-          sender_id: user.id,
-          receiver_id: selectedUser,
-          content: newMessage.trim(),
-          read: false,
-          listing_id: null  // Could be linked to a listing in the future
-        }]);
+        .insert([messageData]);
         
       if (error) throw error;
       
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
     }
   };
+
+  // If context is available, add an automated first message
+  useEffect(() => {
+    const sendFirstMessageWithContext = async () => {
+      if (!user || !selectedUser || !itemContext) return;
+      
+      // Only send if this is a new conversation or we have context
+      const existingConversation = conversations.some(conv => conv.id === selectedUser);
+      
+      if (existingConversation) return;
+      
+      try {
+        let contextMessage = "";
+        let itemId = null;
+        let itemType = null;
+        
+        if (itemContext.type === 'listing') {
+          contextMessage = `Hi, I'm interested in your listing: "${itemContext.title}"`;
+          itemId = itemContext.id;
+          itemType = 'listing';
+        } else if (itemContext.type === 'lostfound') {
+          contextMessage = `Hi, I'm contacting you about your lost & found item: "${itemContext.title}"`;
+          itemId = itemContext.id;
+          itemType = 'lostfound';
+        }
+        
+        if (!contextMessage) return;
+        
+        const messageData: any = {
+          sender_id: user.id,
+          receiver_id: selectedUser,
+          content: contextMessage,
+          read: false
+        };
+        
+        // Add item reference 
+        if (itemType === 'listing') {
+          messageData.listing_id = itemId;
+        } else if (itemType === 'lostfound') {
+          messageData.lost_found_id = itemId;
+        }
+        
+        await supabase.from('messages').insert([messageData]);
+        
+        // Clear context to avoid sending duplicates
+        setItemContext(null);
+      } catch (error) {
+        console.error('Error sending first message:', error);
+      }
+    };
+    
+    // Only attempt to send first message when we have conversations loaded and selected user
+    if (conversations.length > 0 && selectedUser && itemContext) {
+      sendFirstMessageWithContext();
+    }
+  }, [conversations, selectedUser, itemContext, user]);
 
   return (
     <div className="h-[calc(100vh-7rem)] grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -230,25 +327,54 @@ export function MessagesList() {
                   No messages yet
                 </div>
               ) : (
-                messages.map(message => (
-                  <div 
-                    key={message.id} 
-                    className={`mb-4 flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div 
-                      className={`py-2 px-4 rounded-lg max-w-[80%] ${
-                        message.sender_id === user?.id 
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      <p>{message.content}</p>
-                      <p className="text-xs opacity-70 text-right mt-1">
-                        {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                <>
+                  {messages.map((message, index) => {
+                    // Check if this message has item context
+                    const hasListingContext = message.listing_id !== null;
+                    const hasLostFoundContext = message.lost_found_id !== null;
+                    const isFirstMessageWithContext = index === 0 && (hasListingContext || hasLostFoundContext);
+                    
+                    return (
+                      <div key={message.id}>
+                        {isFirstMessageWithContext && (
+                          <div className="flex justify-center my-4">
+                            <div className="bg-gray-100 rounded-lg py-2 px-4 text-sm text-center">
+                              <p className="text-gray-500 mb-2">
+                                {hasListingContext ? 'Conversation about listing' : 'Conversation about lost & found item'}
+                              </p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                asChild
+                                className="text-xs"
+                              >
+                                <Link to={hasListingContext ? `/listing/${message.listing_id}` : `/lost-found/${message.lost_found_id}`}>
+                                  View Item <ExternalLink className="h-3 w-3 ml-1" />
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        <div 
+                          className={`mb-4 flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div 
+                            className={`py-2 px-4 rounded-lg max-w-[80%] ${
+                              message.sender_id === user?.id 
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            <p>{message.content}</p>
+                            <p className="text-xs opacity-70 text-right mt-1">
+                              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </div>
             

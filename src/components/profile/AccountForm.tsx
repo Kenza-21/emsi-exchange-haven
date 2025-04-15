@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,12 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { Profile } from '@/types/database';
 
-export const AccountForm = () => {
+type AccountFormProps = {
+  profile?: Profile;
+  onProfileUpdate?: (updatedProfile: Profile) => void;
+};
+
+export const AccountForm = ({ profile, onProfileUpdate }: AccountFormProps) => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -20,11 +25,22 @@ export const AccountForm = () => {
     bio: string;
   }>({
     defaultValues: {
-      fullName: user?.user_metadata?.full_name || '',
-      studentId: user?.user_metadata?.student_id || '',
-      bio: user?.user_metadata?.bio || ''
+      fullName: profile?.full_name || user?.user_metadata?.full_name || '',
+      studentId: profile?.student_id || user?.user_metadata?.student_id || '',
+      bio: profile?.bio || user?.user_metadata?.bio || ''
     }
   });
+  
+  // Update form values when profile changes
+  useEffect(() => {
+    if (profile) {
+      form.reset({
+        fullName: profile.full_name || '',
+        studentId: profile.student_id || '',
+        bio: profile.bio || ''
+      });
+    }
+  }, [profile, form]);
 
   const onSubmit = async (data: {
     fullName: string;
@@ -62,6 +78,18 @@ export const AccountForm = () => {
         title: 'Profile Updated',
         description: 'Your profile has been successfully updated.'
       });
+      
+      // If callback provided, call it with updated profile
+      if (onProfileUpdate) {
+        const updatedProfile: Profile = {
+          id: user.id,
+          full_name: data.fullName,
+          student_id: data.studentId,
+          bio: data.bio,
+          created_at: profile?.created_at || new Date().toISOString()
+        };
+        onProfileUpdate(updatedProfile);
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
