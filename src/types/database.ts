@@ -1,9 +1,9 @@
-
 export type Profile = {
   id: string;
   full_name: string | null;
   student_id: string | null;
   created_at: string;
+  bio?: string | null;
 };
 
 export type Listing = {

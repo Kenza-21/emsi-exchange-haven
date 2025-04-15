@@ -131,7 +131,8 @@ export type Database = {
           content: string
           created_at: string
           id: string
-          listing_id: string
+          listing_id: string | null
+          lost_found_id: string | null
           read: boolean | null
           receiver_id: string
           sender_id: string
@@ -140,7 +141,8 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
-          listing_id: string
+          listing_id?: string | null
+          lost_found_id?: string | null
           read?: boolean | null
           receiver_id: string
           sender_id: string
@@ -149,7 +151,8 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
-          listing_id?: string
+          listing_id?: string | null
+          lost_found_id?: string | null
           read?: boolean | null
           receiver_id?: string
           sender_id?: string
@@ -160,6 +163,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_lost_found_id_fkey"
+            columns: ["lost_found_id"]
+            isOneToOne: false
+            referencedRelation: "lost_found"
             referencedColumns: ["id"]
           },
           {

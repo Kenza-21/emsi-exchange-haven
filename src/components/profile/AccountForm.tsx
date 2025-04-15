@@ -1,131 +1,134 @@
 
-import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { toast } from '@/hooks/use-toast';
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from '@/hooks/use-toast';
 import { Profile } from '@/types/database';
 
-interface AccountFormProps {
-  profile: Profile | null;
-  onProfileUpdate: (updatedProfile: Profile) => void;
-}
-
-export const AccountForm = ({ profile, onProfileUpdate }: AccountFormProps) => {
+export const AccountForm = () => {
   const { user } = useAuth();
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [studentId, setStudentId] = useState(profile?.student_id || '');
-  const [bio, setBio] = useState(profile?.bio || '');
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const form = useForm<{
+    fullName: string;
+    studentId: string;
+    bio: string;
+  }>({
+    defaultValues: {
+      fullName: user?.user_metadata?.full_name || '',
+      studentId: user?.user_metadata?.student_id || '',
+      bio: user?.user_metadata?.bio || ''
+    }
+  });
+
+  const onSubmit = async (data: {
+    fullName: string;
+    studentId: string;
+    bio: string;
+  }) => {
     if (!user) return;
-    
-    setIsUpdating(true);
-    
+
+    setIsSubmitting(true);
+
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: fullName,
-          student_id: studentId,
-          bio: bio
+          full_name: data.fullName,
+          student_id: data.studentId,
+          bio: data.bio
         })
         .eq('id', user.id);
-        
+
       if (error) throw error;
-      
-      const updatedProfile = {
-        ...profile!,
-        full_name: fullName,
-        student_id: studentId,
-        bio: bio
-      };
-      
-      onProfileUpdate(updatedProfile);
-      
+
+      // Update user metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: {
+          full_name: data.fullName,
+          student_id: data.studentId,
+          bio: data.bio
+        }
+      });
+
+      if (updateError) throw updateError;
+
       toast({
-        title: "Profile Updated",
-        description: "Your profile information has been updated."
+        title: 'Profile Updated',
+        description: 'Your profile has been successfully updated.'
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: error.message,
-        variant: "destructive"
+        variant: 'destructive'
       });
     } finally {
-      setIsUpdating(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>Account Information</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleUpdateProfile} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              value={user?.email || ''}
-              disabled
-            />
-            <p className="text-xs text-gray-500">Email cannot be changed</p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input
-              id="fullName"
-              placeholder="Your full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="studentId">Student ID</Label>
-            <Input
-              id="studentId"
-              placeholder="Your EMSI student ID number"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea
-              id="bio"
-              placeholder="Tell us about yourself"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={4}
-            />
-          </div>
-          
-          <CardFooter className="px-0 pt-4">
-            <Button
-              type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700"
-              disabled={isUpdating}
-            >
-              {isUpdating ? 'Updating...' : 'Update Profile'}
-            </Button>
-          </CardFooter>
-        </form>
-      </CardContent>
-    </Card>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="fullName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Full Name</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter your full name" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="studentId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Student ID</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter your student ID" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="bio"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Bio</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="Tell us a bit about yourself" 
+                  {...field} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Updating...' : 'Update Profile'}
+        </Button>
+      </form>
+    </Form>
   );
 };
