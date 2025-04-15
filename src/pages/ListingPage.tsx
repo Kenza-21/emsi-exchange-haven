@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
@@ -9,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 
 const ListingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,12 +16,12 @@ const ListingPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
-  const [message, setMessage] = useState('');
+  const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !seller || !message.trim()) return;
+    if (!user || !seller || !messageContent.trim() || !listing) return;
     
     setIsSending(true);
     
@@ -31,8 +31,8 @@ const ListingPage = () => {
         .insert([{
           sender_id: user.id,
           receiver_id: seller.id,
-          listing_id: listing?.id,
-          content: message.trim(),
+          listing_id: listing.id,
+          content: messageContent.trim(),
           read: false
         }]);
         
@@ -43,9 +43,8 @@ const ListingPage = () => {
         description: "Your message has been sent to the seller."
       });
       
-      setMessage('');
+      setMessageContent('');
       setIsMessageModalOpen(false);
-      navigate('/messages');
     } catch (error: any) {
       toast({
         title: "Error",
@@ -211,8 +210,8 @@ const ListingPage = () => {
                   <textarea
                     className="w-full border rounded-lg p-3 min-h-[100px]"
                     placeholder="Write your message here..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    value={messageContent}
+                    onChange={(e) => setMessageContent(e.target.value)}
                     required
                   ></textarea>
                 </div>

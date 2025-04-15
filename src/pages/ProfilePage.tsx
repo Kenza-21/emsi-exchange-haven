@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -6,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,6 +19,7 @@ const ProfilePage = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [fullName, setFullName] = useState('');
   const [studentId, setStudentId] = useState('');
+  const [bio, setBio] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -39,6 +40,7 @@ const ProfilePage = () => {
         setProfile(data);
         setFullName(data.full_name || '');
         setStudentId(data.student_id || '');
+        setBio(data.bio || '');
       } catch (error) {
         console.error('Error fetching profile:', error);
       } finally {
@@ -83,7 +85,8 @@ const ProfilePage = () => {
         .from('profiles')
         .update({
           full_name: fullName,
-          student_id: studentId
+          student_id: studentId,
+          bio: bio
         })
         .eq('id', user.id);
         
@@ -96,7 +99,12 @@ const ProfilePage = () => {
       
       setProfile(prev => {
         if (!prev) return null;
-        return { ...prev, full_name: fullName, student_id: studentId };
+        return { 
+          ...prev, 
+          full_name: fullName, 
+          student_id: studentId,
+          bio: bio 
+        };
       });
     } catch (error: any) {
       toast({
@@ -106,6 +114,33 @@ const ProfilePage = () => {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+  
+  const handleDeleteListing = async (listingId: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', listingId)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Listing Deleted",
+        description: "Your listing has been successfully removed."
+      });
+      
+      setMyListings(prev => prev.filter(listing => listing.id !== listingId));
+    } catch (error: any) {
+      toast({
+        title: "Error Deleting Listing",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
   
@@ -125,6 +160,7 @@ const ProfilePage = () => {
         <TabsList className="mb-6">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="listings">My Listings</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
         </TabsList>
         
         <TabsContent value="account">
@@ -167,6 +203,17 @@ const ProfilePage = () => {
                   />
                 </div>
                 
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    placeholder="Tell us about yourself"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                
                 <CardFooter className="px-0 pt-4">
                   <Button
                     type="submit"
@@ -198,7 +245,35 @@ const ProfilePage = () => {
         
         <TabsContent value="listings">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">My Listings</h2>
-          <ListingGrid listings={myListings} isLoading={loadingListings} />
+          {myListings.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myListings.map(listing => (
+                <Card key={listing.id} className="relative">
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-lg mb-2">{listing.title}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{listing.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-emerald-600 font-medium">{listing.price?.toFixed(2)} MAD</span>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => handleDeleteListing(listing.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">You haven't created any listings yet.</p>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="messages">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Messages</h2>
+          <p>Message functionality coming soon.</p>
         </TabsContent>
       </Tabs>
     </div>
