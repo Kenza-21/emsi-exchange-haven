@@ -1,7 +1,6 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { toast } from '@/hooks/use-toast';
 
@@ -23,47 +22,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
       setLoading(false);
-      return;
-    }
+    });
 
-    const initializeAuth = async () => {
-      // Set up auth state listener first
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-        }
-      );
-
-      // Then check for existing session
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-
-      return () => subscription.unsubscribe();
-    };
-
-    initializeAuth();
+    return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, studentId: string) => {
-    if (!isSupabaseConfigured) {
-      toast({
-        title: "Supabase not configured",
-        description: "Please connect to Supabase using the green button in the top right corner.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
-      // Sign up the user
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
+      const { data, error } = await supabase.auth.signUp({
+        email,
         password,
         options: {
           data: {
@@ -72,64 +53,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       });
-      
+
       if (error) throw error;
-      
+
       if (data.user) {
-        // Create a profile for the user
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{ 
-            id: data.user.id,
-            full_name: fullName,
-            student_id: studentId
-          }]);
-          
-        if (profileError) {
-          console.error("Error creating profile:", profileError);
-          toast({
-            title: "Error creating profile",
-            description: profileError.message,
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Account created",
-            description: "Your account has been created successfully."
-          });
-          
-          if (data.session) {
-            setSession(data.session);
-            setUser(data.user);
-            navigate('/');
-          } else {
-            toast({
-              title: "Please check your email",
-              description: "We've sent you an email with a confirmation link."
-            });
-          }
-        }
+        toast({
+          title: "Account created successfully",
+          description: "Welcome to EMSIExchangeHub!"
+        });
+        navigate('/');
       }
     } catch (error: any) {
-      console.error("Error in signup:", error);
+      console.error('Error in signup:', error);
       toast({
         title: "Error creating account",
         description: error.message,
         variant: "destructive"
       });
+      throw error;
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    if (!isSupabaseConfigured) {
-      toast({
-        title: "Supabase not configured",
-        description: "Please connect to Supabase using the green button in the top right corner.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
@@ -155,8 +100,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    if (!isSupabaseConfigured) return;
-
     try {
       await supabase.auth.signOut();
       setSession(null);

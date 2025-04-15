@@ -1,12 +1,10 @@
-
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { toast } from '@/hooks/use-toast';
 
 export function RegisterForm() {
   const [fullName, setFullName] = useState('');
@@ -18,7 +16,6 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   
   const { signUp } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,12 +30,16 @@ export function RegisterForm() {
       setError("Password must be at least 6 characters long");
       return;
     }
+
+    if (!fullName || !studentId) {
+      setError("All fields are required");
+      return;
+    }
     
     setIsLoading(true);
     
     try {
       await signUp(email, password, fullName, studentId);
-      // Note: Navigation is now handled in the AuthContext after successful signup
     } catch (error: any) {
       console.error("Register form error:", error);
       setError(error.message || "An error occurred during registration");
