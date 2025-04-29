@@ -1,3 +1,4 @@
+
 export type Profile = {
   id: string;
   full_name: string | null;
@@ -29,7 +30,8 @@ export type Message = {
   id: string;
   sender_id: string;
   receiver_id: string;
-  listing_id: string;
+  listing_id: string | null;
+  lost_found_id: string | null; // Added this field
   content: string;
   created_at: string;
   read: boolean | null;
