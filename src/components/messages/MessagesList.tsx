@@ -4,13 +4,15 @@ import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
-import { Message, Profile } from '@/types/database';
+import { Message, Profile, Friend } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useFriends } from '@/hooks/useFriends';
 
 interface ConversationPartner extends Profile {
   lastMessage?: Message;
+  isFriend?: boolean;
 }
 
 interface ItemContext {
@@ -22,6 +24,7 @@ interface ItemContext {
 export function MessagesList() {
   const { user } = useAuth();
   const location = useLocation();
+  const { friends } = useFriends();
   const [conversations, setConversations] = useState<ConversationPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -82,12 +85,18 @@ export function MessagesList() {
           
         if (partnersError) throw partnersError;
         
-        // Add last message to each partner
+        // Add last message to each partner and check if they are friends
         const conversationsWithLastMessage = partnersData.map((partner: Profile) => {
           const lastMessage = messagesData?.find((msg: Message) => 
             msg.sender_id === partner.id || msg.receiver_id === partner.id
           );
-          return { ...partner, lastMessage };
+          
+          const isFriend = friends.some(f => 
+            (f.sender_id === partner.id && f.receiver_id === user.id) || 
+            (f.receiver_id === partner.id && f.sender_id === user.id)
+          );
+          
+          return { ...partner, lastMessage, isFriend };
         });
         
         setConversations(conversationsWithLastMessage);
@@ -99,7 +108,7 @@ export function MessagesList() {
     };
 
     fetchConversations();
-  }, [user]);
+  }, [user, friends]);
 
   // Fetch messages for selected conversation
   useEffect(() => {
@@ -250,6 +259,17 @@ export function MessagesList() {
     }
   }, [conversations, selectedUser, itemContext, user]);
 
+  // Get unread messages count for conversations
+  const getUnreadCount = (partnerId: string) => {
+    if (!user) return 0;
+    
+    return conversations
+      .find(conv => conv.id === partnerId)?.lastMessage?.read === false && 
+      conversations.find(conv => conv.id === partnerId)?.lastMessage?.sender_id === partnerId 
+      ? 1 
+      : 0;
+  };
+
   return (
     <div className="h-[calc(100vh-7rem)] grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Conversations List */}
@@ -268,35 +288,51 @@ export function MessagesList() {
               No conversations yet
             </div>
           ) : (
-            conversations.map(partner => (
-              <div 
-                key={partner.id} 
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                  selectedUser === partner.id ? 'bg-emerald-50' : ''
-                }`}
-                onClick={() => setSelectedUser(partner.id)}
-              >
-                <div className="flex items-center">
-                  <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                    {partner.full_name?.[0] || '?'}
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-800">{partner.full_name}</p>
+            conversations.map(partner => {
+              const unreadCount = getUnreadCount(partner.id);
+              
+              return (
+                <div 
+                  key={partner.id} 
+                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                    selectedUser === partner.id ? 'bg-emerald-50' : ''
+                  } ${unreadCount > 0 ? 'bg-emerald-50/50' : ''}`}
+                  onClick={() => setSelectedUser(partner.id)}
+                >
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center relative">
+                      {partner.full_name?.[0] || '?'}
+                      {partner.isFriend && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
+                      )}
+                    </div>
+                    <div className="ml-3">
+                      <div className="flex items-center">
+                        <p className={`font-medium text-gray-800 ${unreadCount > 0 ? 'font-bold' : ''}`}>
+                          {partner.full_name}
+                        </p>
+                        {unreadCount > 0 && (
+                          <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      {partner.lastMessage && (
+                        <p className={`text-sm text-gray-500 truncate ${unreadCount > 0 ? 'font-medium' : ''}`}>
+                          {partner.lastMessage.sender_id === user?.id ? 'You: ' : ''}
+                          {partner.lastMessage.content}
+                        </p>
+                      )}
+                    </div>
                     {partner.lastMessage && (
-                      <p className="text-sm text-gray-500 truncate">
-                        {partner.lastMessage.sender_id === user?.id ? 'You: ' : ''}
-                        {partner.lastMessage.content}
-                      </p>
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {formatDistanceToNow(new Date(partner.lastMessage.created_at), { addSuffix: true })}
+                      </span>
                     )}
                   </div>
-                  {partner.lastMessage && (
-                    <span className="text-xs text-gray-400 ml-auto">
-                      {formatDistanceToNow(new Date(partner.lastMessage.created_at), { addSuffix: true })}
-                    </span>
-                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

@@ -9,8 +9,10 @@ import {
   PlusCircle,
   User,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  UserPlus
 } from 'lucide-react';
+import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 
 export function NavBar() {
   const { user, signOut } = useAuth();
@@ -33,6 +35,10 @@ export function NavBar() {
                 <MessageSquare className="h-5 w-5 mb-1" />
                 <span>Messages</span>
               </Link>
+              <Link to="/friends" className="hover:text-emerald-100 flex flex-col items-center text-xs">
+                <UserPlus className="h-5 w-5 mb-1" />
+                <span>Friends</span>
+              </Link>
               <Link to="/search" className="hover:text-emerald-100 flex flex-col items-center text-xs">
                 <Search className="h-5 w-5 mb-1" />
                 <span>Search</span>
@@ -49,6 +55,10 @@ export function NavBar() {
                 <User className="h-5 w-5 mb-1" />
                 <span>Profile</span>
               </Link>
+              <div className="hover:text-emerald-100 flex flex-col items-center text-xs">
+                <NotificationsDropdown />
+                <span>Alerts</span>
+              </div>
               <Button 
                 variant="ghost" 
                 size="sm" 

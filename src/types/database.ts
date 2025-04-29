@@ -31,7 +31,7 @@ export type Message = {
   sender_id: string;
   receiver_id: string;
   listing_id: string | null;
-  lost_found_id: string | null; // Added this field
+  lost_found_id: string | null;
   content: string;
   created_at: string;
   read: boolean | null;
@@ -46,6 +46,24 @@ export type LostFound = {
   user_id: string;
   image_url: string | null;
   status: 'found' | 'claimed' | string;
+  created_at: string;
+};
+
+export type Friend = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+};
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  type: 'message' | 'friend_request' | string;
+  content: string;
+  related_id: string | null;
+  read: boolean | null;
   created_at: string;
 };
 
