@@ -29,7 +29,7 @@ export function useFriends() {
           .from('friends')
           .select(`
             *,
-            profile:profiles!receiver_id(*)
+            profile:profiles!friends_receiver_id_fkey(*)
           `)
           .eq('sender_id', user.id)
           .eq('status', 'accepted');
@@ -41,7 +41,7 @@ export function useFriends() {
           .from('friends')
           .select(`
             *,
-            profile:profiles!sender_id(*)
+            profile:profiles!friends_sender_id_fkey(*)
           `)
           .eq('receiver_id', user.id)
           .eq('status', 'accepted');
@@ -53,15 +53,20 @@ export function useFriends() {
           .from('friends')
           .select(`
             *,
-            profile:profiles!sender_id(*)
+            profile:profiles!friends_sender_id_fkey(*)
           `)
           .eq('receiver_id', user.id)
           .eq('status', 'pending');
           
         if (pendingError) throw pendingError;
         
-        setFriends([...sentFriends, ...receivedFriends] as FriendWithProfile[]);
-        setPendingRequests(pendingFriendRequests as FriendWithProfile[]);
+        // Cast to proper types after validation
+        const validSentFriends = sentFriends?.filter(f => f.profile && typeof f.profile === 'object') || [];
+        const validReceivedFriends = receivedFriends?.filter(f => f.profile && typeof f.profile === 'object') || [];
+        const validPendingRequests = pendingFriendRequests?.filter(f => f.profile && typeof f.profile === 'object') || [];
+        
+        setFriends([...validSentFriends, ...validReceivedFriends] as FriendWithProfile[]);
+        setPendingRequests(validPendingRequests as FriendWithProfile[]);
       } catch (err: any) {
         console.error('Error fetching friends:', err);
         setError(err.message);
@@ -230,6 +235,35 @@ export function useFriends() {
       return { error: err.message };
     }
   };
+  
+  const checkFriendStatus = async (otherUserId: string) => {
+    if (!user || !otherUserId) return null;
+    
+    try {
+      // Check for any existing friend connection
+      const { data, error } = await supabase
+        .from('friends')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
+        .limit(1);
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        return {
+          exists: true,
+          status: data[0].status,
+          id: data[0].id,
+          isReceiver: data[0].receiver_id === user.id
+        };
+      }
+      
+      return { exists: false };
+    } catch (err) {
+      console.error('Error checking friend status:', err);
+      return null;
+    }
+  };
 
   return { 
     friends, 
@@ -239,6 +273,7 @@ export function useFriends() {
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
-    removeFriend
+    removeFriend,
+    checkFriendStatus
   };
 }

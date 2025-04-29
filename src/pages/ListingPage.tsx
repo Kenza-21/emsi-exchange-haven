@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MessageSquare, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useListing } from '@/hooks/useListing';
@@ -9,6 +9,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { useFriends } from '@/hooks/useFriends';
 
 const ListingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +20,24 @@ const ListingPage = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const { sendFriendRequest, checkFriendStatus } = useFriends();
+  const [friendStatus, setFriendStatus] = useState<any>(null);
+  const [isCheckingFriend, setIsCheckingFriend] = useState(false);
+  
+  useEffect(() => {
+    const loadFriendStatus = async () => {
+      if (!user || !seller) return;
+      
+      setIsCheckingFriend(true);
+      const status = await checkFriendStatus(seller.id);
+      setFriendStatus(status);
+      setIsCheckingFriend(false);
+    };
+    
+    if (seller && user && seller.id !== user.id) {
+      loadFriendStatus();
+    }
+  }, [user, seller, checkFriendStatus]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +75,15 @@ const ListingPage = () => {
       setIsSending(false);
     }
   };
+  
+  const handleAddFriend = async () => {
+    if (!user || !seller) return;
+    
+    const result = await sendFriendRequest(seller.id);
+    if (result.success) {
+      setFriendStatus({ exists: true, status: 'pending' });
+    }
+  };
 
   if (loading) {
     return (
@@ -85,6 +114,44 @@ const ListingPage = () => {
       </div>
     );
   }
+
+  const renderFriendButton = () => {
+    if (!user || user.id === seller?.id || isCheckingFriend) return null;
+    
+    if (friendStatus?.exists) {
+      if (friendStatus.status === 'accepted') {
+        return (
+          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+            Friends
+          </Badge>
+        );
+      } else if (friendStatus.status === 'pending') {
+        if (friendStatus.isReceiver) {
+          return (
+            <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+              Friend Request Received
+            </Badge>
+          );
+        }
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+            Friend Request Sent
+          </Badge>
+        );
+      }
+    }
+    
+    return (
+      <Button 
+        onClick={handleAddFriend} 
+        variant="outline"
+        className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+      >
+        <UserPlus className="h-4 w-4 mr-2" />
+        Add Friend
+      </Button>
+    );
+  };
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -140,7 +207,7 @@ const ListingPage = () => {
           <Card>
             <CardContent className="p-6">
               <h1 className="text-2xl font-bold text-gray-800 mb-2">{listing.title}</h1>
-              <p className="text-2xl font-semibold text-emerald-600 mb-4">{listing.price.toFixed(2)} MAD</p>
+              <p className="text-2xl font-semibold text-emerald-600 mb-4">{listing.price ? `${listing.price.toFixed(2)} MAD` : 'Price not specified'}</p>
               
               <div className="mb-4">
                 <div className="flex gap-2 mb-2">
@@ -167,15 +234,20 @@ const ListingPage = () => {
               </div>
 
               {/* Actions */}
-              <div className="mt-6">
+              <div className="mt-6 space-y-2">
                 {user && user.id !== listing.user_id ? (
-                  <Button 
-                    onClick={() => setIsMessageModalOpen(true)} 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Contact Seller
-                  </Button>
+                  <>
+                    <Button 
+                      onClick={() => setIsMessageModalOpen(true)} 
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Contact Seller
+                    </Button>
+                    <div className="flex justify-center">
+                      {renderFriendButton()}
+                    </div>
+                  </>
                 ) : user && user.id === listing.user_id ? (
                   <div className="space-y-2">
                     <Button 
@@ -184,7 +256,6 @@ const ListingPage = () => {
                     >
                       This is your listing
                     </Button>
-                    {/* Could add edit/delete buttons here */}
                   </div>
                 ) : (
                   <Link to="/login">
