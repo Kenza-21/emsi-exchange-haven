@@ -19,8 +19,8 @@ import PostsPage from './pages/PostsPage'
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Layout>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -39,8 +39,8 @@ function App() {
           </Routes>
           <Toaster />
         </Layout>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 
