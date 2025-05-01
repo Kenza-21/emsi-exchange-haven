@@ -9,14 +9,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Upload } from 'lucide-react';
 
 export function CreateLostFoundForm() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
   const [foundDate, setFoundDate] = useState('');
+  const [location, setLocation] = useState('');
+  const [status, setStatus] = useState<'found' | 'lost'>('found');
   const [image, setImage] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -25,62 +29,92 @@ export function CreateLostFoundForm() {
     if (!user) return;
     
     setIsLoading(true);
+    setUploadProgress(0);
     
     try {
       let imageUrl = null;
       
-      // Upload image if one was selected
+      // Handle image upload first if available
       if (image) {
-        const fileExt = image.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `lost-found/${fileName}`;
+        // Create bucket if it doesn't exist
+        try {
+          const { data: bucketData, error: bucketError } = await supabase
+            .storage
+            .getBucket('lost-found-images');
+            
+          if (bucketError && bucketError.message.includes('does not exist')) {
+            // Create the bucket
+            const { error: createBucketError } = await supabase
+              .storage
+              .createBucket('lost-found-images', {
+                public: true
+              });
+              
+            if (createBucketError) throw createBucketError;
+          }
+        } catch (err) {
+          console.error("Error checking/creating bucket:", err);
+          // Continue with the process even if bucket check fails
+        }
         
-        // Upload the image to Supabase Storage
-        const { error: uploadError } = await supabase
+        // Upload the image
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase
           .storage
-          .from('images')
-          .upload(filePath, image);
+          .from('lost-found-images')
+          .upload(filePath, image, {
+            cacheControl: '3600',
+            upsert: false,
+            onUploadProgress: (progress) => {
+              setUploadProgress(Math.round((progress.loaded / progress.total) * 50));
+            }
+          });
         
         if (uploadError) throw uploadError;
         
-        // Get public URL
-        const { data: publicURL } = supabase
+        // Get the public URL
+        const { data: publicUrlData } = supabase
           .storage
-          .from('images')
-          .getPublicUrl(filePath);
+          .from('lost-found-images')
+          .getPublicUrl(uploadData.path);
           
-        if (publicURL) {
-          imageUrl = publicURL.publicUrl;
-        }
+        imageUrl = publicUrlData.publicUrl;
+        setUploadProgress(75);
       }
       
-      // Create the lost & found entry
-      const { data, error } = await supabase
+      // Create the lost & found item entry
+      const { data: lostFound, error: itemError } = await supabase
         .from('lost_found')
         .insert([{
           title,
           description,
-          location,
           found_date: foundDate,
+          location,
           user_id: user.id,
-          image_url: imageUrl,
-          status: 'found'
+          status,
+          image_url: imageUrl
         }])
         .select()
         .single();
       
-      if (error) throw error;
+      if (itemError) throw itemError;
+      
+      setUploadProgress(100);
       
       toast({
-        title: "Item Posted",
-        description: "Your lost & found item has been posted successfully."
+        title: "Item Reported",
+        description: `Your ${status} item has been reported successfully.`
       });
       
-      navigate('/lost-found');
+      navigate(`/lost-found/${lostFound.id}`);
     } catch (error: any) {
+      console.error('Error creating lost & found item:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to report item. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -91,15 +125,29 @@ export function CreateLostFoundForm() {
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl text-gray-800">Report Found Item</CardTitle>
+        <CardTitle className="text-2xl text-gray-800">Report an Item</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Item Name</Label>
+            <Label>Item Status</Label>
+            <RadioGroup value={status} onValueChange={(val) => setStatus(val as 'lost' | 'found')} className="flex space-x-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="found" id="found" />
+                <Label htmlFor="found" className="cursor-pointer">Found Item</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="lost" id="lost" />
+                <Label htmlFor="lost" className="cursor-pointer">Lost Item</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
             <Input
               id="title"
-              placeholder="What did you find?"
+              placeholder="Brief description of the item"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -114,25 +162,15 @@ export function CreateLostFoundForm() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              required
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
+            <Label htmlFor="date">
+              {status === 'found' ? 'Date Found' : 'Date Lost'}
+            </Label>
             <Input
-              id="location"
-              placeholder="Where did you find it?"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="foundDate">Date Found</Label>
-            <Input
-              id="foundDate"
+              id="date"
               type="date"
               value={foundDate}
               onChange={(e) => setFoundDate(e.target.value)}
@@ -141,13 +179,35 @@ export function CreateLostFoundForm() {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="image">Image</Label>
+            <Label htmlFor="location">Location</Label>
             <Input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImage(e.target.files?.[0] || null)}
+              id="location"
+              placeholder="Where did you find the item?"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
             />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="image">Image</Label>
+            <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer" onClick={() => document.getElementById('image-upload')?.click()}>
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImage(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">
+                {image ? `Selected: ${image.name}` : 'Click to upload an image'}
+              </p>
+            </div>
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                <div className="bg-emerald-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            )}
           </div>
           
           <CardFooter className="px-0 pt-4">
@@ -156,7 +216,7 @@ export function CreateLostFoundForm() {
               className="w-full bg-emerald-600 hover:bg-emerald-700"
               disabled={isLoading}
             >
-              {isLoading ? 'Submitting...' : 'Submit'}
+              {isLoading ? 'Submitting...' : 'Submit Report'}
             </Button>
           </CardFooter>
         </form>

@@ -1,5 +1,6 @@
 
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,9 +14,19 @@ import {
   UserPlus
 } from 'lucide-react';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
+import { Input } from '@/components/ui/input';
 
 export function NavBar() {
   const { user, signOut } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   return (
     <nav className="bg-emerald-600 text-white shadow-md py-2 px-4">
@@ -23,6 +34,23 @@ export function NavBar() {
         <Link to="/" className="flex items-center space-x-2">
           <span className="text-xl font-bold">EMSIExchangeHub</span>
         </Link>
+        
+        {user && (
+          <form onSubmit={handleSearch} className="hidden md:flex items-center max-w-xs w-full">
+            <div className="relative flex-grow">
+              <Input
+                type="text"
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full text-gray-800 py-1 rounded-l-md border-0"
+              />
+            </div>
+            <Button type="submit" className="bg-gray-800 hover:bg-gray-900 rounded-l-none">
+              <Search className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
         
         <div className="flex items-center space-x-6">
           {user ? (
@@ -39,7 +67,7 @@ export function NavBar() {
                 <UserPlus className="h-5 w-5 mb-1" />
                 <span>Friends</span>
               </Link>
-              <Link to="/search" className="hover:text-emerald-100 flex flex-col items-center text-xs">
+              <Link to="/search" className="hover:text-emerald-100 flex flex-col items-center text-xs md:hidden">
                 <Search className="h-5 w-5 mb-1" />
                 <span>Search</span>
               </Link>

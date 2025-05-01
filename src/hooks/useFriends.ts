@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Friend, Profile } from '@/types/database';
@@ -27,10 +26,7 @@ export function useFriends() {
         // Get accepted friends where user is sender
         const { data: sentFriends, error: sentError } = await supabase
           .from('friends')
-          .select(`
-            *,
-            profile:profiles!friends_receiver_id_fkey(*)
-          `)
+          .select('*, profile:profiles!friends_receiver_id_fkey(*)')
           .eq('sender_id', user.id)
           .eq('status', 'accepted');
         
@@ -39,10 +35,7 @@ export function useFriends() {
         // Get accepted friends where user is receiver
         const { data: receivedFriends, error: receivedError } = await supabase
           .from('friends')
-          .select(`
-            *,
-            profile:profiles!friends_sender_id_fkey(*)
-          `)
+          .select('*, profile:profiles!friends_sender_id_fkey(*)')
           .eq('receiver_id', user.id)
           .eq('status', 'accepted');
           
@@ -51,20 +44,21 @@ export function useFriends() {
         // Get pending friend requests sent to the user
         const { data: pendingFriendRequests, error: pendingError } = await supabase
           .from('friends')
-          .select(`
-            *,
-            profile:profiles!friends_sender_id_fkey(*)
-          `)
+          .select('*, profile:profiles!friends_sender_id_fkey(*)')
           .eq('receiver_id', user.id)
           .eq('status', 'pending');
           
         if (pendingError) throw pendingError;
         
-        // Cast to proper types after validation
-        const validSentFriends = sentFriends?.filter(f => f.profile && typeof f.profile === 'object') || [];
-        const validReceivedFriends = receivedFriends?.filter(f => f.profile && typeof f.profile === 'object') || [];
-        const validPendingRequests = pendingFriendRequests?.filter(f => f.profile && typeof f.profile === 'object') || [];
+        // Filter out any entries with invalid profiles and cast properly
+        const validSentFriends = sentFriends
+          ?.filter(f => f.profile && typeof f.profile === 'object' && !('error' in f.profile)) || [];
+        const validReceivedFriends = receivedFriends
+          ?.filter(f => f.profile && typeof f.profile === 'object' && !('error' in f.profile)) || [];
+        const validPendingRequests = pendingFriendRequests
+          ?.filter(f => f.profile && typeof f.profile === 'object' && !('error' in f.profile)) || [];
         
+        // Type assertions after validation
         setFriends([...validSentFriends, ...validReceivedFriends] as FriendWithProfile[]);
         setPendingRequests(validPendingRequests as FriendWithProfile[]);
       } catch (err: any) {

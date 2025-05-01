@@ -84,7 +84,7 @@ const LostFoundPage = () => {
         {user && (
           <Link to="/lost-found/create">
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Report Found Item
+              Report Item
             </Button>
           </Link>
         )}

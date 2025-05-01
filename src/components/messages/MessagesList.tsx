@@ -1,14 +1,16 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { Message, Profile, Friend } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useFriends } from '@/hooks/useFriends';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 
 interface ConversationPartner extends Profile {
   lastMessage?: Message;
@@ -32,6 +34,12 @@ export function MessagesList() {
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [itemContext, setItemContext] = useState<ItemContext | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Check if there's a user to contact from navigation state
   useEffect(() => {
@@ -270,10 +278,26 @@ export function MessagesList() {
       : 0;
   };
 
+  // Format time for messages
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return format(date, 'h:mm a'); // Today: just show time
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday ' + format(date, 'h:mm a'); // Yesterday
+    } else {
+      return format(date, 'MMM d, h:mm a'); // Other days
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-7rem)] grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Conversations List */}
-      <div className="border rounded-lg overflow-hidden bg-white">
+      <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
         <div className="p-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-800">Conversations</h2>
         </div>
@@ -294,26 +318,26 @@ export function MessagesList() {
               return (
                 <div 
                   key={partner.id} 
-                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
                     selectedUser === partner.id ? 'bg-emerald-50' : ''
                   } ${unreadCount > 0 ? 'bg-emerald-50/50' : ''}`}
                   onClick={() => setSelectedUser(partner.id)}
                 >
                   <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center relative">
+                    <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-medium relative">
                       {partner.full_name?.[0] || '?'}
                       {partner.isFriend && (
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
                       )}
                     </div>
-                    <div className="ml-3">
-                      <div className="flex items-center">
-                        <p className={`font-medium text-gray-800 ${unreadCount > 0 ? 'font-bold' : ''}`}>
+                    <div className="ml-3 flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className={`font-medium text-gray-800 truncate ${unreadCount > 0 ? 'font-bold' : ''}`}>
                           {partner.full_name}
                         </p>
-                        {unreadCount > 0 && (
-                          <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                            {unreadCount}
+                        {partner.lastMessage && (
+                          <span className="text-xs text-gray-400 ml-2 shrink-0">
+                            {formatDistanceToNow(new Date(partner.lastMessage.created_at), { addSuffix: true })}
                           </span>
                         )}
                       </div>
@@ -323,12 +347,12 @@ export function MessagesList() {
                           {partner.lastMessage.content}
                         </p>
                       )}
+                      {unreadCount > 0 && (
+                        <span className="inline-block mt-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {unreadCount}
+                        </span>
+                      )}
                     </div>
-                    {partner.lastMessage && (
-                      <span className="text-xs text-gray-400 ml-auto">
-                        {formatDistanceToNow(new Date(partner.lastMessage.created_at), { addSuffix: true })}
-                      </span>
-                    )}
                   </div>
                 </div>
               );
@@ -338,29 +362,41 @@ export function MessagesList() {
       </div>
       
       {/* Messages */}
-      <div className="border rounded-lg overflow-hidden bg-white md:col-span-2">
+      <div className="border rounded-lg overflow-hidden bg-white shadow-sm md:col-span-2 flex flex-col">
         {!selectedUser ? (
-          <div className="flex flex-col justify-center items-center h-full text-gray-500">
-            <p>Select a conversation to start messaging</p>
+          <div className="flex flex-col justify-center items-center h-full text-gray-500 p-4">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <MessageSquare className="h-8 w-8 text-gray-400" />
+            </div>
+            <p className="text-center">Select a conversation to start messaging</p>
           </div>
         ) : (
           <>
             {/* Header */}
-            <div className="p-4 border-b bg-gray-50">
-              <h2 className="font-semibold text-gray-800">
-                {conversations.find(c => c.id === selectedUser)?.full_name}
-              </h2>
+            <div className="p-4 border-b bg-gray-50 flex items-center">
+              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-medium mr-3">
+                {conversations.find(c => c.id === selectedUser)?.full_name?.[0] || '?'}
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-800">
+                  {conversations.find(c => c.id === selectedUser)?.full_name}
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {conversations.find(c => c.id === selectedUser)?.isFriend ? 'Friend' : 'Contact'}
+                </p>
+              </div>
             </div>
             
             {/* Messages */}
-            <div className="p-4 overflow-y-auto h-[calc(100%-8rem)]">
+            <div className="p-4 overflow-y-auto flex-1 bg-gray-50">
               {loadingMessages ? (
                 <div className="flex justify-center items-center h-20">
                   <span>Loading messages...</span>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="text-center text-gray-500">
-                  No messages yet
+                <div className="text-center text-gray-500 my-8">
+                  <p>No messages yet</p>
+                  <p className="text-sm mt-2">Send a message to start the conversation</p>
                 </div>
               ) : (
                 <>
@@ -369,12 +405,23 @@ export function MessagesList() {
                     const hasListingContext = message.listing_id !== null;
                     const hasLostFoundContext = message.lost_found_id !== null;
                     const isFirstMessageWithContext = index === 0 && (hasListingContext || hasLostFoundContext);
+                    const isCurrentUser = message.sender_id === user?.id;
+                    const showDateHeader = index === 0 || 
+                      new Date(messages[index-1].created_at).toDateString() !== new Date(message.created_at).toDateString();
                     
                     return (
                       <div key={message.id}>
+                        {showDateHeader && (
+                          <div className="flex justify-center my-4">
+                            <div className="bg-white px-3 py-1 rounded-full text-xs text-gray-500 shadow-sm">
+                              {format(new Date(message.created_at), 'EEEE, MMMM d')}
+                            </div>
+                          </div>
+                        )}
+                        
                         {isFirstMessageWithContext && (
                           <div className="flex justify-center my-4">
-                            <div className="bg-gray-100 rounded-lg py-2 px-4 text-sm text-center">
+                            <div className="bg-white rounded-lg py-2 px-4 text-sm text-center shadow-sm border border-gray-100">
                               <p className="text-gray-500 mb-2">
                                 {hasListingContext ? 'Conversation about listing' : 'Conversation about lost & found item'}
                               </p>
@@ -391,45 +438,53 @@ export function MessagesList() {
                             </div>
                           </div>
                         )}
+                        
                         <div 
-                          className={`mb-4 flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                          className={`mb-4 flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                         >
                           <div 
-                            className={`py-2 px-4 rounded-lg max-w-[80%] ${
-                              message.sender_id === user?.id 
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-800'
+                            className={`py-2 px-4 rounded-lg max-w-[80%] shadow-sm ${
+                              isCurrentUser 
+                                ? 'bg-emerald-600 text-white rounded-br-none'
+                                : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
                             }`}
                           >
                             <p>{message.content}</p>
-                            <p className="text-xs opacity-70 text-right mt-1">
-                              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                            <p className={`text-xs ${isCurrentUser ? 'text-emerald-100' : 'text-gray-400'} text-right mt-1`}>
+                              {formatMessageTime(message.created_at)}
                             </p>
                           </div>
                         </div>
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} />
                 </>
               )}
             </div>
             
             {/* Message Input */}
-            <div className="p-4 border-t">
-              <form onSubmit={sendMessage} className="flex">
-                <input
-                  type="text"
+            <div className="p-4 border-t bg-white">
+              <form onSubmit={sendMessage} className="flex items-end">
+                <Textarea
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
-                  className="flex-1 border rounded-l-lg py-2 px-4"
+                  className="flex-1 border rounded-lg py-2 px-4 resize-none"
                   placeholder="Type a message..."
+                  rows={1}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage(e);
+                    }
+                  }}
                 />
-                <button
+                <Button
                   type="submit"
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-r-lg"
+                  className="ml-2 bg-emerald-600 text-white p-2 h-10 w-10 flex items-center justify-center rounded-full"
                 >
-                  Send
-                </button>
+                  <Send className="h-4 w-4" />
+                </Button>
               </form>
             </div>
           </>
@@ -438,3 +493,6 @@ export function MessagesList() {
     </div>
   );
 }
+
+// Import at the top of the file
+import { MessageSquare } from 'lucide-react';
