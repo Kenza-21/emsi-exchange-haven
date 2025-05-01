@@ -26,7 +26,10 @@ export function useFriends() {
         // Get accepted friends where user is sender
         const { data: sentFriends, error: sentError } = await supabase
           .from('friends')
-          .select('*, profile:profiles!friends_receiver_id_fkey(*)')
+          .select(`
+            *,
+            profile:profiles!friends_receiver_id_fkey(*)
+          `)
           .eq('sender_id', user.id)
           .eq('status', 'accepted');
         
@@ -35,7 +38,10 @@ export function useFriends() {
         // Get accepted friends where user is receiver
         const { data: receivedFriends, error: receivedError } = await supabase
           .from('friends')
-          .select('*, profile:profiles!friends_sender_id_fkey(*)')
+          .select(`
+            *,
+            profile:profiles!friends_sender_id_fkey(*)
+          `)
           .eq('receiver_id', user.id)
           .eq('status', 'accepted');
           
@@ -44,23 +50,40 @@ export function useFriends() {
         // Get pending friend requests sent to the user
         const { data: pendingFriendRequests, error: pendingError } = await supabase
           .from('friends')
-          .select('*, profile:profiles!friends_sender_id_fkey(*)')
+          .select(`
+            *,
+            profile:profiles!friends_sender_id_fkey(*)
+          `)
           .eq('receiver_id', user.id)
           .eq('status', 'pending');
           
         if (pendingError) throw pendingError;
         
-        // Filter out any entries with invalid profiles and cast properly
-        const validSentFriends = sentFriends
-          ?.filter(f => f.profile && typeof f.profile === 'object' && !('error' in f.profile)) || [];
-        const validReceivedFriends = receivedFriends
-          ?.filter(f => f.profile && typeof f.profile === 'object' && !('error' in f.profile)) || [];
-        const validPendingRequests = pendingFriendRequests
-          ?.filter(f => f.profile && typeof f.profile === 'object' && !('error' in f.profile)) || [];
+        // Safely process and transform the data
+        const processedSentFriends = sentFriends?.map(friend => {
+          // Type assertion after null check
+          if (friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)) {
+            return friend as FriendWithProfile;
+          }
+          return { ...friend, profile: undefined } as FriendWithProfile;
+        }) || [];
         
-        // Type assertions after validation
-        setFriends([...validSentFriends, ...validReceivedFriends] as FriendWithProfile[]);
-        setPendingRequests(validPendingRequests as FriendWithProfile[]);
+        const processedReceivedFriends = receivedFriends?.map(friend => {
+          if (friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)) {
+            return friend as FriendWithProfile;
+          }
+          return { ...friend, profile: undefined } as FriendWithProfile;
+        }) || [];
+        
+        const processedPendingRequests = pendingFriendRequests?.map(friend => {
+          if (friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)) {
+            return friend as FriendWithProfile;
+          }
+          return { ...friend, profile: undefined } as FriendWithProfile;
+        }) || [];
+        
+        setFriends([...processedSentFriends, ...processedReceivedFriends]);
+        setPendingRequests(processedPendingRequests);
       } catch (err: any) {
         console.error('Error fetching friends:', err);
         setError(err.message);
