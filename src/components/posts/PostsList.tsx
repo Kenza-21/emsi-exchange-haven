@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Post } from '@/types/database';
 import { formatDistanceToNow } from 'date-fns';
@@ -34,7 +35,8 @@ export const PostsList: React.FC<PostsListProps> = ({ posts, loading }) => {
     );
   }
 
-  if (posts.length === 0) {
+  // Add an extra safety check to ensure posts is an array
+  if (!posts || !Array.isArray(posts) || posts.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-gray-500">No posts yet</p>
@@ -49,7 +51,9 @@ export const PostsList: React.FC<PostsListProps> = ({ posts, loading }) => {
           <CardHeader className="flex flex-row items-center gap-4 pb-2">
             <Avatar>
               <AvatarFallback>
-                {post.profile?.full_name ? post.profile.full_name[0].toUpperCase() : '?'}
+                {post.profile && post.profile.full_name 
+                  ? post.profile.full_name[0].toUpperCase() 
+                  : '?'}
               </AvatarFallback>
             </Avatar>
             <div>

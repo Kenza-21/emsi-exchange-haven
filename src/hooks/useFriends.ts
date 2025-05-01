@@ -32,7 +32,6 @@ export function useFriends() {
       if (error) throw error;
       
       toast({
-        title: "Friend request sent!",
         description: "Your friend request has been sent successfully."
       });
       
@@ -42,7 +41,6 @@ export function useFriends() {
     } catch (error: any) {
       console.error('Error sending friend request:', error);
       toast({
-        title: "Error",
         description: "Failed to send friend request: " + error.message,
         variant: "destructive"
       });
@@ -195,7 +193,6 @@ export function useFriends() {
         if (error) throw error;
         
         toast({
-          title: "Friend request accepted",
           description: "You are now friends!"
         });
       } else {
@@ -208,7 +205,6 @@ export function useFriends() {
         if (error) throw error;
         
         toast({
-          title: "Friend request rejected",
           description: "The friend request has been rejected."
         });
       }
@@ -218,7 +214,6 @@ export function useFriends() {
     } catch (error: any) {
       console.error('Error responding to friend request:', error);
       toast({
-        title: "Error",
         description: "Failed to respond to friend request: " + error.message,
         variant: "destructive"
       });
@@ -236,7 +231,6 @@ export function useFriends() {
       if (error) throw error;
       
       toast({
-        title: "Friend removed",
         description: "The friend has been removed from your friends list."
       });
       
@@ -245,7 +239,6 @@ export function useFriends() {
     } catch (error: any) {
       console.error('Error removing friend:', error);
       toast({
-        title: "Error",
         description: "Failed to remove friend: " + error.message,
         variant: "destructive"
       });
