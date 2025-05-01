@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -8,23 +9,23 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Search, UserPlus, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Profile } from '@/types/database';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 const FriendsPage = () => {
   const { user, loading: authLoading } = useAuth();
   const { 
     friends, 
     pendingRequests, 
-    loading,
-    acceptFriendRequest,
+    loading, 
+    acceptFriendRequest, 
     rejectFriendRequest,
-    removeFriend,
-    sendFriendRequest
+    removeFriend 
   } = useFriends();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
+  const { sendFriendRequest } = useFriends();
 
   if (authLoading) {
     return <div className="container mx-auto py-8 px-4">Loading...</div>;
@@ -50,12 +51,13 @@ const FriendsPage = () => {
         
       if (error) throw error;
       
-      setSearchResults(data || []);
+      setSearchResults(data);
     } catch (err: any) {
       console.error('Error searching for users:', err);
       toast({
         title: "Error",
-        description: "Failed to search for users"
+        description: "Failed to search for users",
+        variant: "destructive"
       });
     } finally {
       setSearching(false);
@@ -151,8 +153,8 @@ const FriendsPage = () => {
                 {pendingRequests.map(request => (
                   <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="font-medium">{request.profile?.full_name || "Unknown User"}</p>
-                      <p className="text-sm text-gray-500">Student ID: {request.profile?.student_id || "N/A"}</p>
+                      <p className="font-medium">{request.profile?.full_name}</p>
+                      <p className="text-sm text-gray-500">Student ID: {request.profile?.student_id}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button 
@@ -198,8 +200,8 @@ const FriendsPage = () => {
                 return (
                   <div key={friend.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="font-medium">{friendProfile?.full_name || "Unknown User"}</p>
-                      <p className="text-sm text-gray-500">Student ID: {friendProfile?.student_id || "N/A"}</p>
+                      <p className="font-medium">{friendProfile?.full_name}</p>
+                      <p className="text-sm text-gray-500">Student ID: {friendProfile?.student_id}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button

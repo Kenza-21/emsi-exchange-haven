@@ -11,8 +11,7 @@ import {
   User,
   LogOut,
   AlertCircle,
-  UserPlus,
-  FileText
+  UserPlus
 } from 'lucide-react';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Input } from '@/components/ui/input';
@@ -67,10 +66,6 @@ export function NavBar() {
               <Link to="/friends" className="hover:text-emerald-100 flex flex-col items-center text-xs">
                 <UserPlus className="h-5 w-5 mb-1" />
                 <span>Friends</span>
-              </Link>
-              <Link to="/posts" className="hover:text-emerald-100 flex flex-col items-center text-xs">
-                <FileText className="h-5 w-5 mb-1" />
-                <span>Posts</span>
               </Link>
               <Link to="/search" className="hover:text-emerald-100 flex flex-col items-center text-xs md:hidden">
                 <Search className="h-5 w-5 mb-1" />

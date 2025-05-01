@@ -36,33 +36,49 @@ export function CreateLostFoundForm() {
       
       // Handle image upload first if available
       if (image) {
-        // Use items bucket
-        const bucket = 'items';
+        // Create bucket if it doesn't exist
+        try {
+          const { data: bucketData, error: bucketError } = await supabase
+            .storage
+            .getBucket('lost-found-images');
+            
+          if (bucketError && bucketError.message.includes('does not exist')) {
+            // Create the bucket
+            const { error: createBucketError } = await supabase
+              .storage
+              .createBucket('lost-found-images', {
+                public: true
+              });
+              
+            if (createBucketError) throw createBucketError;
+          }
+        } catch (err) {
+          console.error("Error checking/creating bucket:", err);
+          // Continue with the process even if bucket check fails
+        }
         
         // Upload the image
         const fileExt = image.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         const filePath = `${user.id}/${fileName}`;
         
-        // Start upload and track progress manually
-        setUploadProgress(10);
-        
         const { data: uploadData, error: uploadError } = await supabase
           .storage
-          .from(bucket)
+          .from('lost-found-images')
           .upload(filePath, image, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
+            onUploadProgress: (progress) => {
+              setUploadProgress(Math.round((progress.loaded / progress.total) * 50));
+            }
           });
-        
-        setUploadProgress(50);
         
         if (uploadError) throw uploadError;
         
         // Get the public URL
         const { data: publicUrlData } = supabase
           .storage
-          .from(bucket)
+          .from('lost-found-images')
           .getPublicUrl(uploadData.path);
           
         imageUrl = publicUrlData.publicUrl;
