@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Friend, Profile } from '@/types/database';
 import { useAuth } from '@/context/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface FriendWithProfile extends Friend {
   profile?: Profile | null;
@@ -18,7 +18,7 @@ export function useFriends() {
 
   // Function to send a friend request
   const sendFriendRequest = async (receiverId: string) => {
-    if (!user) return;
+    if (!user) return { success: false };
 
     try {
       const { error } = await supabase
@@ -38,6 +38,7 @@ export function useFriends() {
       
       // Refresh the friends list
       fetchFriends();
+      return { success: true };
     } catch (error: any) {
       console.error('Error sending friend request:', error);
       toast({
@@ -45,6 +46,58 @@ export function useFriends() {
         description: "Failed to send friend request: " + error.message,
         variant: "destructive"
       });
+      return { success: false };
+    }
+  };
+
+  // Function to check friend status
+  const checkFriendStatus = async (otherUserId: string) => {
+    if (!user) return null;
+    
+    try {
+      // Check if there's an existing friend relationship
+      const { data: sentRequest, error: sentError } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('sender_id', user.id)
+        .eq('receiver_id', otherUserId)
+        .single();
+        
+      if (sentError && sentError.code !== 'PGRST116') {
+        throw sentError;
+      }
+      
+      const { data: receivedRequest, error: receivedError } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('sender_id', otherUserId)
+        .eq('receiver_id', user.id)
+        .single();
+        
+      if (receivedError && receivedError.code !== 'PGRST116') {
+        throw receivedError;
+      }
+      
+      if (sentRequest) {
+        return {
+          exists: true,
+          status: sentRequest.status,
+          isReceiver: false
+        };
+      }
+      
+      if (receivedRequest) {
+        return {
+          exists: true,
+          status: receivedRequest.status,
+          isReceiver: true
+        };
+      }
+      
+      return { exists: false };
+    } catch (error: any) {
+      console.error('Error checking friend status:', error);
+      return { exists: false, error: error.message };
     }
   };
 
@@ -172,6 +225,37 @@ export function useFriends() {
     }
   };
 
+  // Function to remove a friend
+  const removeFriend = async (friendId: string) => {
+    try {
+      const { error } = await supabase
+        .from('friends')
+        .delete()
+        .eq('id', friendId);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Friend removed",
+        description: "The friend has been removed from your friends list."
+      });
+      
+      // Refresh the friends list
+      fetchFriends();
+    } catch (error: any) {
+      console.error('Error removing friend:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove friend: " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Add alias functions to match FriendsPage expectations
+  const acceptFriendRequest = (friendId: string) => respondToFriendRequest(friendId, true);
+  const rejectFriendRequest = (friendId: string) => respondToFriendRequest(friendId, false);
+
   // Fetch friends when the user changes
   useEffect(() => {
     if (user) {
@@ -189,6 +273,10 @@ export function useFriends() {
     error,
     sendFriendRequest,
     respondToFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    removeFriend,
+    checkFriendStatus,
     refreshFriends: fetchFriends
   };
 }
