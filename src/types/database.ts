@@ -74,6 +74,9 @@ export type Post = {
   image_url: string | null;
   created_at: string;
   updated_at: string;
+  profile?: {
+    full_name: string | null;
+  } | null;
 };
 
 export const CATEGORIES = [

@@ -6,17 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserCircle } from 'lucide-react';
-
-interface Post {
-  id: string;
-  content: string;
-  image_url: string | null;
-  created_at: string;
-  user_id: string;
-  profile?: {
-    full_name: string | null;
-  };
-}
+import { Post } from '@/types/database';
 
 export function PostsList() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -27,6 +17,7 @@ export function PostsList() {
     const fetchPosts = async () => {
       setLoading(true);
       try {
+        // Modified query to use proper join syntax
         const { data, error } = await supabase
           .from('posts')
           .select(`
@@ -37,7 +28,17 @@ export function PostsList() {
           
         if (error) throw error;
         
-        setPosts(data as Post[]);
+        // Type cast to ensure compatibility
+        const typedPosts = data?.map(post => {
+          return {
+            ...post,
+            profile: post.profile && typeof post.profile === 'object' && !('error' in post.profile)
+              ? post.profile
+              : { full_name: null }
+          } as Post;
+        }) || [];
+        
+        setPosts(typedPosts);
       } catch (err: any) {
         console.error('Error fetching posts:', err);
         setError(err.message);
@@ -112,7 +113,7 @@ export function PostsList() {
             <div className="flex items-center space-x-3 mb-3">
               <Avatar className="h-10 w-10 bg-emerald-100 text-emerald-800">
                 <AvatarFallback>
-                  {post.profile?.full_name ? post.profile.full_name[0].toUpperCase() : <UserCircle />}
+                  {post.profile?.full_name?.[0]?.toUpperCase() || <UserCircle />}
                 </AvatarFallback>
               </Avatar>
               

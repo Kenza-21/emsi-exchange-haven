@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Friend, Profile } from '@/types/database';
@@ -5,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
 export interface FriendWithProfile extends Friend {
-  profile?: Profile;
+  profile?: Profile | null;
 }
 
 export function useFriends() {
@@ -61,25 +62,30 @@ export function useFriends() {
         
         // Safely process and transform the data
         const processedSentFriends = sentFriends?.map(friend => {
-          // Type assertion after null check
-          if (friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)) {
-            return friend as FriendWithProfile;
-          }
-          return { ...friend, profile: undefined } as FriendWithProfile;
+          return {
+            ...friend,
+            profile: friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)
+              ? friend.profile as Profile
+              : null
+          } as FriendWithProfile;
         }) || [];
         
         const processedReceivedFriends = receivedFriends?.map(friend => {
-          if (friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)) {
-            return friend as FriendWithProfile;
-          }
-          return { ...friend, profile: undefined } as FriendWithProfile;
+          return {
+            ...friend,
+            profile: friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)
+              ? friend.profile as Profile
+              : null
+          } as FriendWithProfile;
         }) || [];
         
         const processedPendingRequests = pendingFriendRequests?.map(friend => {
-          if (friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)) {
-            return friend as FriendWithProfile;
-          }
-          return { ...friend, profile: undefined } as FriendWithProfile;
+          return {
+            ...friend,
+            profile: friend.profile && typeof friend.profile === 'object' && !('error' in friend.profile)
+              ? friend.profile as Profile
+              : null
+          } as FriendWithProfile;
         }) || [];
         
         setFriends([...processedSentFriends, ...processedReceivedFriends]);
