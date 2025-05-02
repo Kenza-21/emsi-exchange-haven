@@ -4,46 +4,51 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import { LostFound, Profile } from '@/types/database';
+import { useLostFound } from '@/hooks/useLostFound';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const LostFoundDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [item, setItem] = useState<(LostFound & { user_profile?: Profile }) | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { item, loading, error } = useLostFound(id || '');
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    const fetchItemDetails = async () => {
-      if (!id) return;
+  const handleDelete = async () => {
+    if (!user || !item) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const { error } = await supabase
+        .from('lost_found')
+        .delete()
+        .eq('id', item.id)
+        .eq('user_id', user.id); // Ensure user can only delete their own items
       
-      try {
-        const { data, error } = await supabase
-          .from('lost_found')
-          .select(`
-            *,
-            user_profile:profiles(*)
-          `)
-          .eq('id', id)
-          .single();
-        
-        if (error) throw error;
-        
-        setItem(data as any);
-      } catch (err: any) {
-        console.error('Error fetching lost & found item details:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchItemDetails();
-  }, [id]);
+      if (error) throw error;
+      
+      toast({
+        title: "Item Deleted",
+        description: "The item has been successfully deleted."
+      });
+      
+      // Navigate back to the lost & found list
+      navigate('/lost-found');
+    } catch (err: any) {
+      console.error('Error deleting item:', err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete the item.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleContact = async () => {
     if (!user) {
@@ -127,7 +132,7 @@ const LostFoundDetailsPage = () => {
           </Button>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">{item.title}</h1>
           <div className="flex items-center text-sm text-gray-500 mb-6">
-            <span>Found {formatDistanceToNow(new Date(item.found_date), { addSuffix: true })}</span>
+            <span>{item.status === 'found' ? 'Found' : 'Lost'} {formatDistanceToNow(new Date(item.found_date), { addSuffix: true })}</span>
             <span className="mx-2">•</span>
             <span>Posted by {(item as any).user_profile?.full_name || 'Unknown'}</span>
           </div>
@@ -141,6 +146,10 @@ const LostFoundDetailsPage = () => {
                   src={item.image_url} 
                   alt={item.title} 
                   className="w-full object-cover object-center h-80"
+                  onError={(e) => {
+                    // Fallback if image fails to load
+                    (e.target as HTMLImageElement).src = '/placeholder.svg';
+                  }}
                 />
               ) : (
                 <div className="w-full h-80 bg-gray-200 flex items-center justify-center">
@@ -164,9 +173,11 @@ const LostFoundDetailsPage = () => {
                 <div>
                   <span className="text-gray-600 font-medium">Status: </span>
                   <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                    item.status === 'found' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                    item.status === 'found' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-red-100 text-red-800'
                   }`}>
-                    {item.status === 'found' ? 'Found' : 'Claimed'}
+                    {item.status === 'found' ? 'Found' : 'Lost'}
                   </span>
                 </div>
                 <div>
@@ -183,19 +194,50 @@ const LostFoundDetailsPage = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Contact</h2>
-              <Button 
-                className="w-full"
-                onClick={handleContact}
-                disabled={user?.id === item.user_id}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Contact {(item as any).user_profile?.full_name || 'Owner'}
-              </Button>
-              {user?.id === item.user_id && (
-                <p className="text-sm text-gray-500 mt-2 text-center">
-                  This is your item
-                </p>
+              <h2 className="text-xl font-semibold mb-4">Actions</h2>
+              {user?.id === item.user_id ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500 mb-2">
+                    This is your item
+                  </p>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-red-200 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Item
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the item.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-500 hover:bg-red-600"
+                          onClick={handleDelete}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ) : (
+                <Button 
+                  className="w-full"
+                  onClick={handleContact}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Contact {(item as any).user_profile?.full_name || 'Owner'}
+                </Button>
               )}
             </div>
           </div>

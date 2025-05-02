@@ -16,6 +16,11 @@ export function useLostFound(itemId: string): LostFoundDetails {
 
   useEffect(() => {
     const fetchItemDetails = async () => {
+      if (!itemId) {
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       
@@ -40,9 +45,7 @@ export function useLostFound(itemId: string): LostFoundDetails {
       }
     };
 
-    if (itemId) {
-      fetchItemDetails();
-    }
+    fetchItemDetails();
     
     // Subscribe to changes
     const itemSubscription = supabase

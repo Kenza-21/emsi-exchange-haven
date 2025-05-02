@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,21 +41,22 @@ export function CreateLostFoundForm() {
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         const filePath = `${user.id}/${fileName}`;
         
+        // Create custom uploader to track progress
         const { data: uploadData, error: uploadError } = await supabase
           .storage
           .from('lost-found-images')
           .upload(filePath, image, {
             cacheControl: '3600',
-            upsert: false,
-            onUploadProgress: (progress) => {
-              setUploadProgress(Math.round((progress.loaded / progress.total) * 50));
-            }
+            upsert: false
           });
         
         if (uploadError) {
           console.error("Upload error:", uploadError);
           throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
+        
+        // Update progress after successful upload
+        setUploadProgress(75);
         
         // Get the public URL
         const { data: publicUrlData } = supabase
@@ -64,7 +65,7 @@ export function CreateLostFoundForm() {
           .getPublicUrl(uploadData.path);
           
         imageUrl = publicUrlData.publicUrl;
-        setUploadProgress(75);
+        setUploadProgress(90);
       }
       
       // Create the lost & found item entry
@@ -104,6 +105,15 @@ export function CreateLostFoundForm() {
     }
   };
 
+  // Custom function to handle file upload progress manually
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImage(file);
+      setUploadProgress(0); // Reset progress when new file is selected
+    }
+  };
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
@@ -120,7 +130,7 @@ export function CreateLostFoundForm() {
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="lost" id="lost" />
-                <Label htmlFor="lost" className="cursor-pointer">Lost Item</Label>
+                <Label htmlFor="lost" className="cursor-pointer text-red-500">Lost Item</Label>
               </div>
             </RadioGroup>
           </div>
@@ -177,7 +187,7 @@ export function CreateLostFoundForm() {
                 id="image-upload"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setImage(e.target.files?.[0] || null)}
+                onChange={handleImageChange}
                 className="hidden"
               />
               <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
@@ -195,7 +205,7 @@ export function CreateLostFoundForm() {
           <CardFooter className="px-0 pt-4">
             <Button
               type="submit"
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className={`w-full ${status === 'lost' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
               disabled={isLoading}
             >
               {isLoading ? 'Submitting...' : 'Submit Report'}

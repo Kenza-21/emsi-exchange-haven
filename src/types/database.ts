@@ -58,6 +58,10 @@ export type Friend = {
   profile?: Profile | null;
 };
 
+export type FriendWithProfiles = Friend & {
+  profile: Profile | null;
+};
+
 export type Notification = {
   id: string;
   user_id: string;

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
+import { toast } from '@/hooks/use-toast';
 
 interface LostFoundWithUser extends LostFound {
   user_profile?: Profile;
@@ -76,6 +77,35 @@ const LostFoundPage = () => {
     // The searchQuery state will trigger the useEffect
   };
 
+  const handleDelete = async (itemId: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('lost_found')
+        .delete()
+        .eq('id', itemId)
+        .eq('user_id', user.id); // Ensure user can only delete their own items
+      
+      if (error) throw error;
+      
+      // Optimistically remove the item from the UI
+      setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+      
+      toast({
+        title: "Item Deleted",
+        description: "The item has been successfully deleted."
+      });
+    } catch (err: any) {
+      console.error('Error deleting item:', err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete the item.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
@@ -138,13 +168,21 @@ const LostFoundPage = () => {
                     src={item.image_url} 
                     alt={item.title}
                     className="w-full h-full object-cover" 
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      (e.target as HTMLImageElement).src = '/placeholder.svg';
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">
                     No image
                   </div>
                 )}
-                <span className="absolute top-2 right-2 bg-emerald-500 text-white text-xs px-2 py-1 rounded">
+                <span className={`absolute top-2 right-2 text-xs px-2 py-1 rounded ${
+                  item.status === 'lost' 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-emerald-500 text-white'
+                }`}>
                   {item.status}
                 </span>
               </div>
@@ -175,10 +213,23 @@ const LostFoundPage = () => {
                 </p>
               </CardContent>
               
-              <CardFooter className="border-t bg-gray-50 p-3">
-                <Link to={`/lost-found/${item.id}`} className="w-full">
+              <CardFooter className="border-t bg-gray-50 p-3 flex justify-between">
+                <Link to={`/lost-found/${item.id}`} className="flex-1 mr-2">
                   <Button variant="outline" className="w-full">View Details</Button>
                 </Link>
+                
+                {user && user.id === item.user_id && (
+                  <Button 
+                    variant="outline" 
+                    className="border-red-200 hover:bg-red-50 hover:text-red-600"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete(item.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
