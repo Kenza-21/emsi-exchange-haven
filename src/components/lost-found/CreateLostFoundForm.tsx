@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,27 +36,6 @@ export function CreateLostFoundForm() {
       
       // Handle image upload first if available
       if (image) {
-        // Create bucket if it doesn't exist
-        try {
-          const { data: bucketData, error: bucketError } = await supabase
-            .storage
-            .getBucket('lost-found-images');
-            
-          if (bucketError && bucketError.message.includes('does not exist')) {
-            // Create the bucket
-            const { error: createBucketError } = await supabase
-              .storage
-              .createBucket('lost-found-images', {
-                public: true
-              });
-              
-            if (createBucketError) throw createBucketError;
-          }
-        } catch (err) {
-          console.error("Error checking/creating bucket:", err);
-          // Continue with the process even if bucket check fails
-        }
-        
         // Upload the image
         const fileExt = image.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
@@ -73,7 +52,10 @@ export function CreateLostFoundForm() {
             }
           });
         
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
         
         // Get the public URL
         const { data: publicUrlData } = supabase

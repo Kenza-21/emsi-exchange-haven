@@ -45,7 +45,7 @@ export type LostFound = {
   found_date: string;
   user_id: string;
   image_url: string | null;
-  status: 'found' | 'claimed' | string;
+  status: 'found' | 'claimed' | 'lost' | string;
   created_at: string;
 };
 
@@ -55,6 +55,7 @@ export type Friend = {
   receiver_id: string;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
+  profile?: Profile | null;
 };
 
 export type Notification = {
@@ -65,6 +66,18 @@ export type Notification = {
   related_id: string | null;
   read: boolean | null;
   created_at: string;
+};
+
+export type Post = {
+  id: string;
+  content: string;
+  user_id: string;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+  profile?: {
+    full_name: string;
+  };
 };
 
 export const CATEGORIES = [

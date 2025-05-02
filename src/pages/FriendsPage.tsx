@@ -1,225 +1,216 @@
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { useFriends } from '@/hooks/useFriends';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Search, UserPlus, Check, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { Profile } from '@/types/database';
-import { toast } from '@/hooks/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
+import { UserPlus, X, Check, Search, UserMinus, UserX } from 'lucide-react';
 
 const FriendsPage = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading } = useAuth();
   const { 
-    friends, 
-    pendingRequests, 
-    loading, 
-    acceptFriendRequest, 
+    friends,
+    isLoading,
+    error,
+    sendFriendRequest,
+    acceptFriendRequest,
     rejectFriendRequest,
-    removeFriend 
+    cancelFriendRequest,
+    unfriend,
+    searchQuery,
+    setSearchQuery,
+    searchUsers,
+    searchResults,
+    isSearching
   } = useFriends();
+  const [showSearch, setShowSearch] = useState(false);
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Profile[]>([]);
-  const [searching, setSearching] = useState(false);
-  const { sendFriendRequest } = useFriends();
-
-  if (authLoading) {
-    return <div className="container mx-auto py-8 px-4">Loading...</div>;
+  if (loading) {
+    return <div className="container mx-auto py-8">Loading...</div>;
   }
   
   if (!user) {
+    toast({
+      description: "You need to be logged in to view this page",
+    });
     return <Navigate to="/login" />;
   }
-
-  const handleSearch = async (e: React.FormEvent) => {
+  
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
-    setSearching(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .ilike('full_name', `%${searchQuery}%`)
-        .neq('id', user.id)
-        .limit(10);
-        
-      if (error) throw error;
-      
-      setSearchResults(data);
-    } catch (err: any) {
-      console.error('Error searching for users:', err);
-      toast({
-        title: "Error",
-        description: "Failed to search for users",
-        variant: "destructive"
-      });
-    } finally {
-      setSearching(false);
-    }
+    searchUsers(searchQuery);
   };
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Friends</h1>
+      <h1 className="text-2xl font-bold mb-6">Friends</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Search and Add Friends */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Find Friends</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search for users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+      {error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          Error loading friends: {error.message}
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {/* Search Users */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Find Friends</h2>
               <Button 
-                type="submit" 
-                className="bg-gray-800 hover:bg-gray-900"
-                disabled={searching}
+                variant={showSearch ? "outline" : "default"} 
+                size="sm"
+                onClick={() => setShowSearch(!showSearch)}
               >
-                Search
+                {showSearch ? "Hide" : "Find Friends"}
               </Button>
-            </form>
-            
-            <div>
-              {searchResults.length > 0 ? (
-                <div className="space-y-3">
-                  {searchResults.map(profile => {
-                    const isFriend = friends.some(f => 
-                      (f.sender_id === profile.id && f.receiver_id === user.id) || 
-                      (f.receiver_id === profile.id && f.sender_id === user.id)
-                    );
-                    const hasSentRequest = pendingRequests.some(p => 
-                      p.sender_id === user.id && p.receiver_id === profile.id
-                    );
-                    
-                    return (
-                      <div key={profile.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{profile.full_name}</p>
-                          <p className="text-sm text-gray-500">Student ID: {profile.student_id}</p>
-                        </div>
-                        {isFriend ? (
-                          <Button disabled variant="outline">Already Friends</Button>
-                        ) : hasSentRequest ? (
-                          <Button disabled variant="outline">Request Sent</Button>
-                        ) : (
-                          <Button 
-                            onClick={() => sendFriendRequest(profile.id)}
-                            variant="outline"
-                            className="flex items-center"
-                          >
-                            <UserPlus className="h-4 w-4 mr-1" />
-                            Add Friend
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : searchQuery && !searching ? (
-                <p className="text-center text-gray-500 py-4">No users found</p>
-              ) : null}
             </div>
-          </CardContent>
-        </Card>
-        
-        {/* Friend Requests */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Friend Requests</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-4">Loading...</div>
-            ) : pendingRequests.length === 0 ? (
-              <div className="text-center text-gray-500 py-4">No pending friend requests</div>
-            ) : (
+            
+            {showSearch && (
+              <div className="space-y-4">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search by name"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button type="submit" disabled={isSearching}>
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </Button>
+                </form>
+                
+                {searchResults.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {searchResults.map(user => (
+                      <Card key={user.id} className="overflow-hidden">
+                        <CardContent className="p-4 flex justify-between items-center">
+                          <div>
+                            <h3 className="font-semibold">{user.full_name}</h3>
+                            <p className="text-sm text-gray-500">{user.student_id}</p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            onClick={() => sendFriendRequest.mutate(user.id)}
+                            disabled={sendFriendRequest.isPending}
+                          >
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Add
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : searchQuery && !isSearching ? (
+                  <p className="text-center text-gray-500 py-4">No users found</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+          
+          {/* Friend Requests */}
+          {friends?.received.length! > 0 && (
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <h2 className="text-lg font-medium mb-4">Friend Requests</h2>
               <div className="space-y-3">
-                {pendingRequests.map(request => (
-                  <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
+                {friends?.received.map(request => (
+                  <div key={request.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
                     <div>
-                      <p className="font-medium">{request.profile?.full_name}</p>
-                      <p className="text-sm text-gray-500">Student ID: {request.profile?.student_id}</p>
+                      <h3 className="font-medium">{request.profile?.full_name}</h3>
+                      <p className="text-sm text-gray-500">Wants to be friends</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex space-x-2">
                       <Button 
-                        onClick={() => acceptFriendRequest(request.id)}
-                        size="icon"
-                        variant="outline"
-                        className="h-8 w-8 text-green-600 border-green-600"
+                        size="sm" 
+                        variant="outline" 
+                        className="text-green-600 border-green-600 hover:bg-green-50"
+                        onClick={() => acceptFriendRequest.mutate(request.id)}
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4 mr-1" />
+                        Accept
                       </Button>
                       <Button 
-                        onClick={() => rejectFriendRequest(request.id)}
-                        size="icon"
-                        variant="outline"
-                        className="h-8 w-8 text-red-600 border-red-600"
+                        size="sm" 
+                        variant="outline" 
+                        className="text-red-600 border-red-600 hover:bg-red-50"
+                        onClick={() => rejectFriendRequest.mutate(request.id)}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4 mr-1" />
+                        Reject
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Friend List */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Your Friends</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-4">Loading...</div>
-          ) : friends.length === 0 ? (
-            <div className="text-center text-gray-500 py-4">You don't have any friends yet</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {friends.map(friend => {
-                const friendProfile = friend.profile;
-                
-                return (
-                  <div key={friend.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{friendProfile?.full_name}</p>
-                      <p className="text-sm text-gray-500">Student ID: {friendProfile?.student_id}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => removeFriend(friend.id)}
-                        variant="outline"
-                        className="text-red-600 border-red-600"
-                        size="sm"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           )}
-        </CardContent>
-      </Card>
+          
+          {/* Pending Requests */}
+          {friends?.sent.length! > 0 && (
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <h2 className="text-lg font-medium mb-4">Pending Requests</h2>
+              <div className="space-y-3">
+                {friends?.sent.map(request => (
+                  <div key={request.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
+                    <div>
+                      <h3 className="font-medium">{request.profile?.full_name}</h3>
+                      <p className="text-sm text-gray-500">Request pending</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-red-600 border-red-600 hover:bg-red-50"
+                      onClick={() => cancelFriendRequest.mutate(request.id)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Friends List */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <h2 className="text-lg font-medium mb-4">My Friends</h2>
+            {isLoading ? (
+              <p className="text-center text-gray-500 py-4">Loading friends...</p>
+            ) : friends?.connected.length! > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {friends?.connected.map(friend => (
+                  <Card key={friend.id} className="overflow-hidden">
+                    <CardContent className="p-4 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold">
+                          {friend.sender_id === user.id 
+                            ? friend.profile?.full_name
+                            : friend.profile?.full_name}
+                        </h3>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="text-gray-600 hover:text-red-600"
+                        onClick={() => unfriend.mutate(friend.id)}
+                      >
+                        <UserMinus className="h-4 w-4 mr-1" />
+                        Unfriend
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 py-4">
+                You don't have any friends yet. Use the search to find friends!
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
