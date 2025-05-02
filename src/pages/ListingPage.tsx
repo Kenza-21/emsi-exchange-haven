@@ -20,7 +20,7 @@ const ListingPage = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const { sendFriendRequest, checkFriendStatus } = useFriends();
+  const { checkFriendStatus, sendFriendRequest } = useFriends();
   const [friendStatus, setFriendStatus] = useState<any>(null);
   const [isCheckingFriend, setIsCheckingFriend] = useState(false);
   
@@ -76,13 +76,23 @@ const ListingPage = () => {
     }
   };
   
-  const handleAddFriend = async () => {
-    if (!user || !seller) return;
+  const handleSendFriendRequest = () => {
+    if (!seller) return;
     
-    const result = await sendFriendRequest(seller.id);
-    if (result.success) {
-      setFriendStatus({ exists: true, status: 'pending' });
-    }
+    sendFriendRequest(seller.id)
+      .then(() => {
+        toast({
+          title: "Friend request sent",
+          description: `Friend request sent to ${seller.full_name}`,
+        });
+      })
+      .catch(error => {
+        toast({
+          title: "Error",
+          description: "Failed to send friend request",
+          variant: "destructive",
+        });
+      });
   };
 
   if (loading) {
@@ -143,7 +153,7 @@ const ListingPage = () => {
     
     return (
       <Button 
-        onClick={handleAddFriend} 
+        onClick={handleSendFriendRequest} 
         variant="outline"
         className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
       >
