@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { UserPlus, X, Check, Search, UserMinus, UserX } from 'lucide-react';
 
 const FriendsPage = () => {
@@ -111,11 +111,11 @@ const FriendsPage = () => {
           </div>
           
           {/* Friend Requests */}
-          {friends?.received.length! > 0 && (
+          {friends.received.length > 0 && (
             <div className="bg-white rounded-lg shadow-md p-4">
               <h2 className="text-lg font-medium mb-4">Friend Requests</h2>
               <div className="space-y-3">
-                {friends?.received.map(request => (
+                {friends.received.map(request => (
                   <div key={request.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
                     <div>
                       <h3 className="font-medium">{request.profile?.full_name}</h3>
@@ -148,11 +148,11 @@ const FriendsPage = () => {
           )}
           
           {/* Pending Requests */}
-          {friends?.sent.length! > 0 && (
+          {friends.sent.length > 0 && (
             <div className="bg-white rounded-lg shadow-md p-4">
               <h2 className="text-lg font-medium mb-4">Pending Requests</h2>
               <div className="space-y-3">
-                {friends?.sent.map(request => (
+                {friends.sent.map(request => (
                   <div key={request.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
                     <div>
                       <h3 className="font-medium">{request.profile?.full_name}</h3>
@@ -178,9 +178,9 @@ const FriendsPage = () => {
             <h2 className="text-lg font-medium mb-4">My Friends</h2>
             {isLoading ? (
               <p className="text-center text-gray-500 py-4">Loading friends...</p>
-            ) : friends?.connected.length! > 0 ? (
+            ) : friends.connected.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {friends?.connected.map(friend => (
+                {friends.connected.map(friend => (
                   <Card key={friend.id} className="overflow-hidden">
                     <CardContent className="p-4 flex justify-between items-center">
                       <div>

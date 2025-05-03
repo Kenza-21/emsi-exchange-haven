@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Input } from "@/components/ui/input";
 import { Search, Trash2 } from "lucide-react";
 import { toast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface LostFoundWithUser extends LostFound {
   user_profile?: Profile;
@@ -20,6 +21,8 @@ const LostFoundPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -79,8 +82,30 @@ const LostFoundPage = () => {
 
   const handleDelete = async (itemId: string) => {
     if (!user) return;
+    setIsDeleting(true);
     
     try {
+      // Find the item to get the image URL
+      const itemToRemove = items.find(item => item.id === itemId);
+
+      // Remove image from storage if it exists
+      if (itemToRemove?.image_url) {
+        const imageUrlParts = itemToRemove.image_url.split('/');
+        const filePathIndex = imageUrlParts.findIndex(part => part === 'lost-found-images');
+        
+        if (filePathIndex !== -1) {
+          // Extract the path after 'lost-found-images/'
+          const storagePath = imageUrlParts.slice(filePathIndex + 1).join('/');
+          
+          // Delete the image from storage
+          await supabase
+            .storage
+            .from('lost-found-images')
+            .remove([storagePath]);
+        }
+      }
+      
+      // Delete item from database
       const { error } = await supabase
         .from('lost_found')
         .delete()
@@ -103,6 +128,9 @@ const LostFoundPage = () => {
         description: err.message || "Failed to delete the item.",
         variant: "destructive"
       });
+    } finally {
+      setIsDeleting(false);
+      setItemToDelete(null); // Reset item to delete
     }
   };
 
@@ -219,16 +247,40 @@ const LostFoundPage = () => {
                 </Link>
                 
                 {user && user.id === item.user_id && (
-                  <Button 
-                    variant="outline" 
-                    className="border-red-200 hover:bg-red-50 hover:text-red-600"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleDelete(item.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <AlertDialog open={itemToDelete === item.id} onOpenChange={(open) => {
+                    if (!open) setItemToDelete(null);
+                  }}>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="border-red-200 hover:bg-red-50 hover:text-red-600"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setItemToDelete(item.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Item</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this item? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-500 hover:bg-red-600"
+                          onClick={() => handleDelete(item.id)}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </CardFooter>
             </Card>

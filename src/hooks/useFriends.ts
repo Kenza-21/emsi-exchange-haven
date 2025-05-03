@@ -2,11 +2,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Friend, Profile, FriendWithProfiles } from '@/types/database';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, QueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 
 export function useFriends() {
   const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const queryClient = new QueryClient();
   
   // Define the query for fetching friends
   const fetchFriends = async () => {
@@ -114,10 +118,10 @@ export function useFriends() {
   }, [data]);
 
   // Function to send a friend request
-  const sendFriendRequest = async (receiverId: string) => {
-    if (!user) return null;
-    
-    try {
+  const sendFriendRequest = useMutation({
+    mutationFn: async (receiverId: string) => {
+      if (!user) throw new Error("User not authenticated");
+      
       const { data, error } = await supabase
         .from('friends')
         .insert({
@@ -129,56 +133,114 @@ export function useFriends() {
         .single();
       
       if (error) throw error;
-      
-      // Refetch to update the UI
-      refetch();
-      
       return data;
-    } catch (error) {
-      console.error('Error sending friend request:', error);
-      throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
     }
-  };
+  });
 
   // Function to accept a friend request
-  const acceptFriendRequest = async (requestId: string) => {
-    try {
+  const acceptFriendRequest = useMutation({
+    mutationFn: async (requestId: string) => {
+      if (!user) throw new Error("User not authenticated");
+      
       const { error } = await supabase
         .from('friends')
         .update({ status: 'accepted' })
         .eq('id', requestId)
-        .eq('receiver_id', user?.id); // Ensure the current user is the receiver
+        .eq('receiver_id', user.id); // Ensure the current user is the receiver
       
       if (error) throw error;
-      
-      // Refetch to update the UI
-      refetch();
-      
       return true;
-    } catch (error) {
-      console.error('Error accepting friend request:', error);
-      throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
     }
-  };
+  });
 
   // Function to reject a friend request
-  const rejectFriendRequest = async (requestId: string) => {
-    try {
+  const rejectFriendRequest = useMutation({
+    mutationFn: async (requestId: string) => {
+      if (!user) throw new Error("User not authenticated");
+      
       const { error } = await supabase
         .from('friends')
         .update({ status: 'rejected' })
         .eq('id', requestId)
-        .eq('receiver_id', user?.id); // Ensure the current user is the receiver
+        .eq('receiver_id', user.id); // Ensure the current user is the receiver
+      
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
+    }
+  });
+
+  // Function to cancel a friend request
+  const cancelFriendRequest = useMutation({
+    mutationFn: async (requestId: string) => {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('friends')
+        .delete()
+        .eq('id', requestId)
+        .eq('sender_id', user.id); // Ensure the current user is the sender
+      
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
+    }
+  });
+
+  // Function to unfriend
+  const unfriend = useMutation({
+    mutationFn: async (friendId: string) => {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('friends')
+        .delete()
+        .eq('id', friendId)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`); // User must be either sender or receiver
+      
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
+    }
+  });
+
+  // Function to search users
+  const searchUsers = async (query: string) => {
+    if (!user || !query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    setIsSearching(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('full_name', `%${query}%`)
+        .neq('id', user.id) // Don't include current user
+        .limit(20);
       
       if (error) throw error;
       
-      // Refetch to update the UI
-      refetch();
-      
-      return true;
+      setSearchResults(data || []);
     } catch (error) {
-      console.error('Error rejecting friend request:', error);
-      throw error;
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -189,7 +251,14 @@ export function useFriends() {
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
+    cancelFriendRequest,
+    unfriend,
     checkFriendStatus,
-    refetch
+    refetch,
+    searchQuery,
+    setSearchQuery,
+    searchUsers,
+    searchResults,
+    isSearching
   };
 }

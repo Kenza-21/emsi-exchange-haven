@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow, format } from 'date-fns';
 import { Message, Profile, Friend } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Send } from 'lucide-react';
+import { ExternalLink, Send, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useFriends } from '@/hooks/useFriends';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,7 +26,7 @@ interface ItemContext {
 export function MessagesList() {
   const { user } = useAuth();
   const location = useLocation();
-  const { friends } = useFriends();
+  const { friends, checkFriendStatus } = useFriends();
   const [conversations, setConversations] = useState<ConversationPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -99,10 +99,7 @@ export function MessagesList() {
             msg.sender_id === partner.id || msg.receiver_id === partner.id
           );
           
-          const isFriend = friends.some(f => 
-            (f.sender_id === partner.id && f.receiver_id === user.id) || 
-            (f.receiver_id === partner.id && f.sender_id === user.id)
-          );
+          const isFriend = checkFriendStatus(partner.id) === 'connected';
           
           return { ...partner, lastMessage, isFriend };
         });
@@ -116,7 +113,7 @@ export function MessagesList() {
     };
 
     fetchConversations();
-  }, [user, friends]);
+  }, [user, checkFriendStatus]);
 
   // Fetch messages for selected conversation
   useEffect(() => {
@@ -271,9 +268,9 @@ export function MessagesList() {
   const getUnreadCount = (partnerId: string) => {
     if (!user) return 0;
     
-    return conversations
-      .find(conv => conv.id === partnerId)?.lastMessage?.read === false && 
-      conversations.find(conv => conv.id === partnerId)?.lastMessage?.sender_id === partnerId 
+    const conversation = conversations.find(conv => conv.id === partnerId);
+    return conversation?.lastMessage?.read === false && 
+      conversation?.lastMessage?.sender_id === partnerId 
       ? 1 
       : 0;
   };
@@ -493,6 +490,3 @@ export function MessagesList() {
     </div>
   );
 }
-
-// Import at the top of the file
-import { MessageSquare } from 'lucide-react';
