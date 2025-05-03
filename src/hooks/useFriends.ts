@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Friend, Profile, FriendWithProfiles } from '@/types/database';
-import { useQuery, useMutation, QueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 
 export function useFriends() {
@@ -10,7 +10,7 @@ export function useFriends() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const queryClient = new QueryClient();
+  const queryClient = useQueryClient();
   
   // Define the query for fetching friends
   const fetchFriends = async () => {

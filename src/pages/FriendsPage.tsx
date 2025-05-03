@@ -44,6 +44,96 @@ const FriendsPage = () => {
     searchUsers(searchQuery);
   };
 
+  const handleSendFriendRequest = (userId: string) => {
+    sendFriendRequest.mutate(userId, {
+      onSuccess: () => {
+        toast({
+          title: "Friend request sent",
+          description: "Your friend request has been sent!"
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to send friend request: " + error.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  const handleAcceptFriendRequest = (requestId: string) => {
+    acceptFriendRequest.mutate(requestId, {
+      onSuccess: () => {
+        toast({
+          title: "Friend request accepted",
+          description: "You are now friends!"
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to accept friend request: " + error.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  const handleRejectFriendRequest = (requestId: string) => {
+    rejectFriendRequest.mutate(requestId, {
+      onSuccess: () => {
+        toast({
+          title: "Friend request rejected",
+          description: "The friend request has been rejected."
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to reject friend request: " + error.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  const handleCancelFriendRequest = (requestId: string) => {
+    cancelFriendRequest.mutate(requestId, {
+      onSuccess: () => {
+        toast({
+          title: "Friend request cancelled",
+          description: "Your friend request has been cancelled."
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to cancel friend request: " + error.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
+  const handleUnfriend = (friendId: string) => {
+    unfriend.mutate(friendId, {
+      onSuccess: () => {
+        toast({
+          title: "Unfriended",
+          description: "You have removed this friend."
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to unfriend: " + error.message,
+          variant: "destructive"
+        });
+      }
+    });
+  };
+
   return (
     <div className="container mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold mb-6">Friends</h1>
@@ -93,7 +183,7 @@ const FriendsPage = () => {
                           </div>
                           <Button 
                             size="sm" 
-                            onClick={() => sendFriendRequest.mutate(user.id)}
+                            onClick={() => handleSendFriendRequest(user.id)}
                             disabled={sendFriendRequest.isPending}
                           >
                             <UserPlus className="h-4 w-4 mr-2" />
@@ -126,7 +216,7 @@ const FriendsPage = () => {
                         size="sm" 
                         variant="outline" 
                         className="text-green-600 border-green-600 hover:bg-green-50"
-                        onClick={() => acceptFriendRequest.mutate(request.id)}
+                        onClick={() => handleAcceptFriendRequest(request.id)}
                       >
                         <Check className="h-4 w-4 mr-1" />
                         Accept
@@ -135,7 +225,7 @@ const FriendsPage = () => {
                         size="sm" 
                         variant="outline" 
                         className="text-red-600 border-red-600 hover:bg-red-50"
-                        onClick={() => rejectFriendRequest.mutate(request.id)}
+                        onClick={() => handleRejectFriendRequest(request.id)}
                       >
                         <X className="h-4 w-4 mr-1" />
                         Reject
@@ -162,7 +252,7 @@ const FriendsPage = () => {
                       size="sm" 
                       variant="outline" 
                       className="text-red-600 border-red-600 hover:bg-red-50"
-                      onClick={() => cancelFriendRequest.mutate(request.id)}
+                      onClick={() => handleCancelFriendRequest(request.id)}
                     >
                       <X className="h-4 w-4 mr-1" />
                       Cancel
@@ -194,7 +284,7 @@ const FriendsPage = () => {
                         size="sm" 
                         variant="outline"
                         className="text-gray-600 hover:text-red-600"
-                        onClick={() => unfriend.mutate(friend.id)}
+                        onClick={() => handleUnfriend(friend.id)}
                       >
                         <UserMinus className="h-4 w-4 mr-1" />
                         Unfriend

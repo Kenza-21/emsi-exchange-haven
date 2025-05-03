@@ -1,51 +1,73 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, MessageSquare, Trash2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Trash2 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
 import { useLostFound } from '@/hooks/useLostFound';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useAuth } from '@/context/AuthContext';
+import { formatDistanceToNow, format } from 'date-fns';
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const LostFoundDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
+  const { item, owner, loading, error, refetch } = useLostFound(id || '');
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { item, loading, error, refetch } = useLostFound(id || '');
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [messageContent, setMessageContent] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
+  
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !owner || !messageContent.trim() || !item) return;
+    
+    setIsSending(true);
+    
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .insert([{
+          sender_id: user.id,
+          receiver_id: owner.id,
+          lost_found_id: item.id,
+          content: messageContent.trim(),
+          read: false
+        }]);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Message Sent",
+        description: "Your message has been sent to the owner."
+      });
+      
+      setMessageContent('');
+      setIsMessageModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+  
   const handleDelete = async () => {
-    if (!user || !item) return;
+    if (!user || !item || user.id !== item.user_id) return;
     
     setIsDeleting(true);
     
     try {
-      // First, check if there's an image to delete from storage
-      if (item.image_url) {
-        const imageUrlParts = item.image_url.split('/');
-        const filePathIndex = imageUrlParts.findIndex(part => part === 'lost-found-images');
-        
-        if (filePathIndex !== -1) {
-          // Extract the path after 'lost-found-images/'
-          const storagePath = imageUrlParts.slice(filePathIndex + 1).join('/');
-          
-          // Delete the image from storage
-          await supabase
-            .storage
-            .from('lost-found-images')
-            .remove([storagePath]);
-        }
-      }
-      
-      // Then delete the item from the database
       const { error } = await supabase
         .from('lost_found')
         .delete()
-        .eq('id', item.id)
-        .eq('user_id', user.id); // Ensure user can only delete their own items
-      
+        .eq('id', item.id);
+        
       if (error) throw error;
       
       toast({
@@ -53,13 +75,11 @@ const LostFoundDetailsPage = () => {
         description: "The item has been successfully deleted."
       });
       
-      // Navigate back to the lost & found list
       navigate('/lost-found');
-    } catch (err: any) {
-      console.error('Error deleting item:', err);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: err.message || "Failed to delete the item.",
+        description: error.message,
         variant: "destructive"
       });
     } finally {
@@ -67,56 +87,15 @@ const LostFoundDetailsPage = () => {
     }
   };
 
-  const handleContact = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to contact the owner",
-        variant: "destructive"
-      });
-      navigate('/login');
-      return;
-    }
-
-    if (!item || !item.user_id) {
-      toast({
-        title: "Error",
-        description: "Could not contact the owner, missing information",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Don't allow messaging yourself
-    if (user.id === item.user_id) {
-      toast({
-        title: "Cannot message yourself",
-        description: "This is your own lost & found item",
-      });
-      return;
-    }
-
-    // Navigate to messages with pre-selected user
-    navigate('/messages', { 
-      state: { 
-        contactUserId: item.user_id,
-        itemContext: {
-          type: 'lostfound',
-          id: item.id,
-          title: item.title
-        }
-      } 
-    });
-  };
-
   if (loading) {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="h-80 bg-gray-200 rounded mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-64 bg-gray-200 rounded mb-4"></div>
+          <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-32 bg-gray-200 rounded mb-4"></div>
         </div>
       </div>
     );
@@ -125,12 +104,14 @@ const LostFoundDetailsPage = () => {
   if (error || !item) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
-          <p className="text-gray-700">{error || "Item not found"}</p>
-          <Button className="mt-4" onClick={() => navigate('/lost-found')}>
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          Error loading item: {error || 'Item not found'}
+        </div>
+        <div className="mt-4">
+          <Link to="/lost-found" className="text-emerald-600 hover:underline flex items-center">
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Lost & Found
-          </Button>
+          </Link>
         </div>
       </div>
     );
@@ -138,132 +119,147 @@ const LostFoundDetailsPage = () => {
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Button 
-            variant="ghost" 
-            className="mb-4"
-            onClick={() => navigate('/lost-found')}
-          >
-            ← Back to Lost & Found
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">{item?.title}</h1>
-          <div className="flex items-center text-sm text-gray-500 mb-6">
-            <span>{item?.status === 'found' ? 'Found' : 'Lost'} {item && formatDistanceToNow(new Date(item.found_date), { addSuffix: true })}</span>
-            <span className="mx-2">•</span>
-            <span>Posted by {(item as any)?.user_profile?.full_name || 'Unknown'}</span>
+      <div className="mb-6">
+        <Link to="/lost-found" className="text-emerald-600 hover:underline flex items-center">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Lost & Found
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Image and Description */}
+        <div className="md:col-span-2">
+          {item.image_url ? (
+            <div className="bg-gray-100 rounded-lg overflow-hidden">
+              <img 
+                src={item.image_url} 
+                alt={item.title}
+                className="w-full h-80 object-contain"
+              />
+            </div>
+          ) : (
+            <div className="bg-gray-200 rounded-lg flex items-center justify-center h-80">
+              <span className="text-gray-500">No image available</span>
+            </div>
+          )}
+
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Description</h2>
+            <p className="text-gray-700 whitespace-pre-line">{item.description || 'No description provided.'}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-              {item?.image_url ? (
-                <img 
-                  src={item.image_url} 
-                  alt={item.title} 
-                  className="w-full object-cover object-center h-80"
-                  onError={(e) => {
-                    // Fallback if image fails to load
-                    (e.target as HTMLImageElement).src = '/placeholder.svg';
-                  }}
-                />
-              ) : (
-                <div className="w-full h-80 bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-500">No Image Available</span>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">Description</h2>
-              <p className="text-gray-700 whitespace-pre-line">
-                {item?.description || "No description provided"}
-              </p>
-            </div>
-          </div>
-
-          <div className="md:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-xl font-semibold mb-4">Details</h2>
-              {item && (
-                <div className="space-y-3">
-                  <div>
-                    <span className="text-gray-600 font-medium">Status: </span>
-                    <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                      item.status === 'found' 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {item.status === 'found' ? 'Found' : 'Lost'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 font-medium">Location: </span>
-                    <span className="text-gray-700">{item.location || 'Not specified'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 font-medium">Found Date: </span>
-                    <span className="text-gray-700">
-                      {new Date(item.found_date).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {item && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-4">Actions</h2>
-                {user?.id === item.user_id ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-500 mb-2">
-                      This is your item
-                    </p>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          className="w-full border-red-200 hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Item
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the item.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-500 hover:bg-red-600"
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                          >
-                            {isDeleting ? 'Deleting...' : 'Delete'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                ) : (
-                  <Button 
-                    className="w-full"
-                    onClick={handleContact}
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Contact {(item as any).user_profile?.full_name || 'Owner'}
-                  </Button>
+        {/* Item Details */}
+        <div>
+          <Card>
+            <CardContent className="p-6">
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">{item.title}</h1>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-500">
+                  {item.status === 'found' ? 'Found' : 'Lost'} {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                </p>
+                <p className="text-sm text-gray-500">
+                  Found on: {format(new Date(item.found_date), 'PPP')}
+                </p>
+                {item.location && (
+                  <p className="text-sm text-gray-500">
+                    Location: {item.location}
+                  </p>
                 )}
               </div>
-            )}
-          </div>
+              
+              <div className="border-t border-gray-200 my-4 pt-4">
+                <h3 className="font-medium text-gray-700 mb-2">
+                  {item.status === 'found' ? 'Finder' : 'Owner'}
+                </h3>
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                    {owner?.full_name?.[0] || '?'}
+                  </div>
+                  <span className="ml-3 font-medium">{owner?.full_name}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 space-y-2">
+                {user && user.id !== item.user_id ? (
+                  <Button 
+                    onClick={() => setIsMessageModalOpen(true)} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Contact {item.status === 'found' ? 'Finder' : 'Owner'}
+                  </Button>
+                ) : user && user.id === item.user_id ? (
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={handleDelete}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Item
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <Link to="/login">
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
+                      Sign in to contact {item.status === 'found' ? 'finder' : 'owner'}
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* Message Modal */}
+      {isMessageModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Message the {item.status === 'found' ? 'Finder' : 'Owner'}</h3>
+              <form onSubmit={handleSendMessage}>
+                <div className="mb-4">
+                  <textarea
+                    className="w-full border rounded-lg p-3 min-h-[100px]"
+                    placeholder="Write your message here..."
+                    value={messageContent}
+                    onChange={(e) => setMessageContent(e.target.value)}
+                    required
+                  ></textarea>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsMessageModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={isSending}
+                  >
+                    {isSending ? 'Sending...' : 'Send Message'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

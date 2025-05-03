@@ -21,7 +21,7 @@ const ListingPage = () => {
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
   const { checkFriendStatus, sendFriendRequest } = useFriends();
-  const [friendStatus, setFriendStatus] = useState<any>(null);
+  const [friendStatus, setFriendStatus] = useState<string | null>(null);
   const [isCheckingFriend, setIsCheckingFriend] = useState(false);
   
   useEffect(() => {
@@ -29,7 +29,7 @@ const ListingPage = () => {
       if (!user || !seller) return;
       
       setIsCheckingFriend(true);
-      const status = await checkFriendStatus(seller.id);
+      const status = checkFriendStatus(seller.id);
       setFriendStatus(status);
       setIsCheckingFriend(false);
     };
@@ -79,20 +79,22 @@ const ListingPage = () => {
   const handleSendFriendRequest = () => {
     if (!seller) return;
     
-    sendFriendRequest(seller.id)
-      .then(() => {
+    sendFriendRequest.mutate(seller.id, {
+      onSuccess: () => {
         toast({
           title: "Friend request sent",
           description: `Friend request sent to ${seller.full_name}`,
         });
-      })
-      .catch(error => {
+        setFriendStatus('sent');
+      },
+      onError: (error) => {
         toast({
           title: "Error",
           description: "Failed to send friend request",
           variant: "destructive",
         });
-      });
+      }
+    });
   };
 
   if (loading) {
@@ -128,27 +130,24 @@ const ListingPage = () => {
   const renderFriendButton = () => {
     if (!user || user.id === seller?.id || isCheckingFriend) return null;
     
-    if (friendStatus?.exists) {
-      if (friendStatus.status === 'accepted') {
-        return (
-          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-            Friends
-          </Badge>
-        );
-      } else if (friendStatus.status === 'pending') {
-        if (friendStatus.isReceiver) {
-          return (
-            <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-              Friend Request Received
-            </Badge>
-          );
-        }
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            Friend Request Sent
-          </Badge>
-        );
-      }
+    if (friendStatus === 'connected') {
+      return (
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+          Friends
+        </Badge>
+      );
+    } else if (friendStatus === 'sent') {
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+          Friend Request Sent
+        </Badge>
+      );
+    } else if (friendStatus === 'received') {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+          Friend Request Received
+        </Badge>
+      );
     }
     
     return (
