@@ -49,23 +49,10 @@ export type LostFound = {
   created_at: string;
 };
 
-export type Friend = {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  created_at: string;
-  profile?: Profile | null;
-};
-
-export type FriendWithProfiles = Friend & {
-  profile: Profile | null;
-};
-
 export type Notification = {
   id: string;
   user_id: string;
-  type: 'message' | 'friend_request' | string;
+  type: 'message' | string;
   content: string;
   related_id: string | null;
   read: boolean | null;

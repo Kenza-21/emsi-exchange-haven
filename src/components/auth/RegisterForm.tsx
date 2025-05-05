@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -33,6 +34,11 @@ export function RegisterForm() {
 
     if (!fullName || !studentId) {
       setError("All fields are required");
+      return;
+    }
+
+    if (!email.endsWith('@emsi-edu.ma')) {
+      setError("Only @emsi-edu.ma email addresses are allowed");
       return;
     }
     
@@ -77,12 +83,13 @@ export function RegisterForm() {
             <Input
               id="email"
               type="email"
-              placeholder="your.email@example.com"
+              placeholder="your.email@emsi-edu.ma"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
             />
+            <p className="text-xs text-gray-500">Only @emsi-edu.ma email addresses are allowed</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="studentId">Student ID</Label>

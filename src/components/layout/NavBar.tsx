@@ -10,8 +10,7 @@ import {
   PlusCircle,
   User,
   LogOut,
-  AlertCircle,
-  UserPlus
+  AlertCircle
 } from 'lucide-react';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Input } from '@/components/ui/input';
@@ -59,13 +58,13 @@ export function NavBar() {
                 <Home className="h-5 w-5 mb-1" />
                 <span>Home</span>
               </Link>
+              <Link to="/dashboard" className="hover:text-emerald-100 flex flex-col items-center text-xs">
+                <Search className="h-5 w-5 mb-1" />
+                <span>Dashboard</span>
+              </Link>
               <Link to="/messages" className="hover:text-emerald-100 flex flex-col items-center text-xs">
                 <MessageSquare className="h-5 w-5 mb-1" />
                 <span>Messages</span>
-              </Link>
-              <Link to="/friends" className="hover:text-emerald-100 flex flex-col items-center text-xs">
-                <UserPlus className="h-5 w-5 mb-1" />
-                <span>Friends</span>
               </Link>
               <Link to="/lost-found" className="hover:text-emerald-100 flex flex-col items-center text-xs">
                 <AlertCircle className="h-5 w-5 mb-1" />

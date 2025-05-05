@@ -18,7 +18,7 @@ import LostFoundPage from "./pages/LostFoundPage";
 import LostFoundDetailsPage from "./pages/LostFoundDetailsPage";
 import CreateLostFoundPage from "./pages/CreateLostFoundPage";
 import ProfilePage from "./pages/ProfilePage";
-import FriendsPage from "./pages/FriendsPage";
+import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,7 +38,7 @@ const App = () => (
               <Route path="/listing/:id" element={<ListingPage />} />
               <Route path="/create-listing" element={<CreateListingPage />} />
               <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/friends" element={<FriendsPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/lost-found" element={<LostFoundPage />} />
               <Route path="/lost-found/:id" element={<LostFoundDetailsPage />} />
               <Route path="/lost-found/create" element={<CreateLostFoundPage />} />
