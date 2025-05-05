@@ -8,14 +8,13 @@ import { Message, Profile } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Send, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useFriends } from '@/hooks/useFriends';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMessages } from '@/hooks/useMessages';
 
 interface ConversationPartner extends Profile {
   lastMessage?: Message;
-  isFriend?: boolean;
   unreadCount: number;
 }
 
@@ -28,7 +27,7 @@ interface ItemContext {
 export function MessagesList() {
   const { user } = useAuth();
   const location = useLocation();
-  const { friends, checkFriendStatus } = useFriends();
+  const { unreadCount: totalUnreadCount, markConversationAsRead } = useMessages();
   const [conversations, setConversations] = useState<ConversationPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -95,7 +94,7 @@ export function MessagesList() {
           
       if (partnersError) throw partnersError;
       
-      // Add last message to each partner and check if they are friends
+      // Add last message to each partner and count unread messages
       const conversationsWithLastMessage = partnersData.map((partner: Profile) => {
         // Get all messages with this partner
         const conversationMessages = messagesData?.filter((msg: Message) => 
@@ -109,17 +108,15 @@ export function MessagesList() {
         );
         
         const lastMessage = conversationMessages[0];
-        const isFriend = checkFriendStatus(partner.id) === 'connected';
         
         // Count unread messages
         const unreadCount = conversationMessages.filter(
-          (msg: Message) => msg.sender_id === partner.id && !msg.read
+          (msg: Message) => msg.sender_id === partner.id && msg.receiver_id === user.id && !msg.read
         ).length;
         
         return { 
           ...partner, 
           lastMessage, 
-          isFriend,
           unreadCount
         };
       });
@@ -160,9 +157,9 @@ export function MessagesList() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user, checkFriendStatus]);
+  }, [user]);
 
-  // Fetch messages for selected conversation
+  // Fetch messages for selected conversation and mark as read
   const fetchMessages = async () => {
     if (!user || !selectedUser) return;
     
@@ -179,20 +176,9 @@ export function MessagesList() {
       
       setMessages(data as Message[]);
       
-      // Mark messages as read
-      const unreadMessages = data.filter(msg => 
-        msg.sender_id === selectedUser && msg.receiver_id === user.id && !msg.read
-      );
+      // Mark messages as read automatically when conversation is opened
+      await markConversationAsRead(selectedUser);
       
-      if (unreadMessages.length > 0) {
-        await supabase
-          .from('messages')
-          .update({ read: true })
-          .in('id', unreadMessages.map(msg => msg.id));
-          
-        // Refresh conversations to update unread counts
-        fetchConversations();
-      }
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -400,9 +386,6 @@ export function MessagesList() {
                 <div className="flex items-center">
                   <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-medium relative">
                     {partner.full_name?.[0] || '?'}
-                    {partner.isFriend && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
-                    )}
                   </div>
                   <div className="ml-3 flex-1 min-w-0">
                     <div className="flex items-center justify-between">
@@ -456,9 +439,7 @@ export function MessagesList() {
                 <h2 className="font-semibold text-gray-800">
                   {conversations.find(c => c.id === selectedUser)?.full_name}
                 </h2>
-                <p className="text-xs text-gray-500">
-                  {conversations.find(c => c.id === selectedUser)?.isFriend ? 'Friend' : 'Contact'}
-                </p>
+                <p className="text-xs text-gray-500">EMSI Student</p>
               </div>
             </div>
             

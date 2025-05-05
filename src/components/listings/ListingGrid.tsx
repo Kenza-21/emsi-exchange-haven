@@ -10,9 +10,9 @@ interface ListingGridProps {
 export function ListingGrid({ listings, isLoading = false }: ListingGridProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {Array(8).fill(0).map((_, index) => (
-          <div key={index} className="h-72 bg-gray-200 animate-pulse rounded-lg"></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {Array(6).fill(0).map((_, index) => (
+          <div key={index} className="h-80 bg-gray-200 animate-pulse rounded-lg"></div>
         ))}
       </div>
     );
@@ -28,7 +28,7 @@ export function ListingGrid({ listings, isLoading = false }: ListingGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
       {listings.map(listing => (
         <ListingCard key={listing.id} listing={listing} />
       ))}
