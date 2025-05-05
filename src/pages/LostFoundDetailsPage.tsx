@@ -1,6 +1,7 @@
+
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, Trash2, Check } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, MessageSquare, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLostFound } from '@/hooks/useLostFound';
@@ -8,7 +9,6 @@ import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow, format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 
 const LostFoundDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +46,18 @@ const LostFoundDetailsPage = () => {
       
       setMessageContent('');
       setIsMessageModalOpen(false);
+
+      // Navigate to the messages page with context about the conversation
+      navigate('/messages', { 
+        state: { 
+          contactUserId: owner.id, 
+          itemContext: {
+            type: 'lostfound',
+            id: item.id,
+            title: item.title
+          }
+        } 
+      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -173,19 +185,32 @@ const LostFoundDetailsPage = () => {
                 <h3 className="font-medium text-gray-700 mb-2">
                   {item.status === 'found' ? 'Finder' : 'Owner'}
                 </h3>
-                <div className="flex items-center">
-                  <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                    {owner?.full_name?.[0] || '?'}
+                {owner ? (
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                      {owner?.full_name?.[0] || '?'}
+                    </div>
+                    <span className="ml-3 font-medium">{owner?.full_name}</span>
                   </div>
-                  <span className="ml-3 font-medium">{owner?.full_name}</span>
-                </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Information unavailable</p>
+                )}
               </div>
 
               {/* Actions */}
               <div className="mt-6 space-y-2">
-                {user && user.id !== item.user_id ? (
+                {user && user.id !== item.user_id && owner ? (
                   <Button 
-                    onClick={() => setIsMessageModalOpen(true)} 
+                    onClick={() => navigate('/messages', { 
+                      state: { 
+                        contactUserId: owner.id,
+                        itemContext: {
+                          type: 'lostfound',
+                          id: item.id,
+                          title: item.title
+                        }
+                      } 
+                    })}
                     className="w-full bg-emerald-600 hover:bg-emerald-700"
                   >
                     <MessageSquare className="h-4 w-4 mr-2" />
@@ -222,44 +247,6 @@ const LostFoundDetailsPage = () => {
           </Card>
         </div>
       </div>
-
-      {/* Message Modal */}
-      {isMessageModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">Message the {item.status === 'found' ? 'Finder' : 'Owner'}</h3>
-              <form onSubmit={handleSendMessage}>
-                <div className="mb-4">
-                  <textarea
-                    className="w-full border rounded-lg p-3 min-h-[100px]"
-                    placeholder="Write your message here..."
-                    value={messageContent}
-                    onChange={(e) => setMessageContent(e.target.value)}
-                    required
-                  ></textarea>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsMessageModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    disabled={isSending}
-                  >
-                    {isSending ? 'Sending...' : 'Send Message'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -5,46 +5,50 @@ import { LostFound, Profile } from '@/types/database';
 
 interface LostFoundDetails {
   item: (LostFound & { user_profile?: Profile }) | null;
+  owner: Profile | null;
   loading: boolean;
   error: string | null;
+  refetch: () => Promise<void>;
 }
 
 export function useLostFound(itemId: string): LostFoundDetails {
   const [item, setItem] = useState<(LostFound & { user_profile?: Profile }) | null>(null);
+  const [owner, setOwner] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchItemDetails = async () => {
-      if (!itemId) {
-        setLoading(false);
-        return;
-      }
+  const fetchItemDetails = async () => {
+    if (!itemId) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('lost_found')
+        .select(`
+          *,
+          user_profile:profiles(*)
+        `)
+        .eq('id', itemId)
+        .single();
       
-      setLoading(true);
-      setError(null);
+      if (error) throw error;
       
-      try {
-        const { data, error } = await supabase
-          .from('lost_found')
-          .select(`
-            *,
-            user_profile:profiles(*)
-          `)
-          .eq('id', itemId)
-          .single();
-        
-        if (error) throw error;
-        
-        setItem(data as any);
-      } catch (err: any) {
-        console.error('Error fetching lost & found item details:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setItem(data as any);
+      setOwner(data.user_profile as Profile);
+    } catch (err: any) {
+      console.error('Error fetching lost & found item details:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchItemDetails();
     
     // Subscribe to changes
@@ -66,5 +70,9 @@ export function useLostFound(itemId: string): LostFoundDetails {
     };
   }, [itemId]);
 
-  return { item, loading, error };
+  const refetch = async () => {
+    await fetchItemDetails();
+  };
+
+  return { item, owner, loading, error, refetch };
 }

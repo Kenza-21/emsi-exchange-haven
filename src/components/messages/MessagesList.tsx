@@ -4,17 +4,19 @@ import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow, format } from 'date-fns';
-import { Message, Profile, Friend } from '@/types/database';
+import { Message, Profile } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Send, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useFriends } from '@/hooks/useFriends';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ConversationPartner extends Profile {
   lastMessage?: Message;
   isFriend?: boolean;
+  unreadCount: number;
 }
 
 interface ItemContext {
@@ -35,6 +37,7 @@ export function MessagesList() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [itemContext, setItemContext] = useState<ItemContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   // Auto scroll to bottom when messages change
   useEffect(() => {
@@ -53,117 +56,153 @@ export function MessagesList() {
   }, [location.state]);
 
   // Fetch conversations
-  useEffect(() => {
-    const fetchConversations = async () => {
-      if (!user) return;
-      setLoading(true);
+  const fetchConversations = async () => {
+    if (!user) return;
+    setLoading(true);
+    
+    try {
+      // Get all messages where the user is either sender or receiver
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
       
-      try {
-        // Get all messages where the user is either sender or receiver
-        const { data: messagesData, error: messagesError } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .order('created_at', { ascending: false });
-        
-        if (messagesError) throw messagesError;
-        
-        // Get unique conversation partners
-        const conversationPartnerIds = new Set<string>();
-        messagesData?.forEach((message: Message) => {
-          if (message.sender_id === user.id) {
-            conversationPartnerIds.add(message.receiver_id);
-          } else {
-            conversationPartnerIds.add(message.sender_id);
-          }
-        });
-        
-        // Get profiles of conversation partners
-        const partnerIds = Array.from(conversationPartnerIds);
-        if (partnerIds.length === 0) {
-          setConversations([]);
-          setLoading(false);
-          return;
+      if (messagesError) throw messagesError;
+      
+      // Get unique conversation partners
+      const conversationPartnerIds = new Set<string>();
+      messagesData?.forEach((message: Message) => {
+        if (message.sender_id === user.id) {
+          conversationPartnerIds.add(message.receiver_id);
+        } else {
+          conversationPartnerIds.add(message.sender_id);
         }
-        
-        const { data: partnersData, error: partnersError } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', partnerIds);
-          
-        if (partnersError) throw partnersError;
-        
-        // Add last message to each partner and check if they are friends
-        const conversationsWithLastMessage = partnersData.map((partner: Profile) => {
-          const lastMessage = messagesData?.find((msg: Message) => 
-            msg.sender_id === partner.id || msg.receiver_id === partner.id
-          );
-          
-          const isFriend = checkFriendStatus(partner.id) === 'connected';
-          
-          return { ...partner, lastMessage, isFriend };
-        });
-        
-        setConversations(conversationsWithLastMessage);
-      } catch (error) {
-        console.error('Error fetching conversations:', error);
-      } finally {
+      });
+      
+      // Get profiles of conversation partners
+      const partnerIds = Array.from(conversationPartnerIds);
+      if (partnerIds.length === 0) {
+        setConversations([]);
         setLoading(false);
+        return;
       }
-    };
+      
+      const { data: partnersData, error: partnersError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', partnerIds);
+          
+      if (partnersError) throw partnersError;
+      
+      // Add last message to each partner and check if they are friends
+      const conversationsWithLastMessage = partnersData.map((partner: Profile) => {
+        // Get all messages with this partner
+        const conversationMessages = messagesData?.filter((msg: Message) => 
+          (msg.sender_id === partner.id && msg.receiver_id === user.id) || 
+          (msg.sender_id === user.id && msg.receiver_id === partner.id)
+        ) || [];
+        
+        // Sort by created_at to get the latest message
+        conversationMessages.sort((a: Message, b: Message) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        
+        const lastMessage = conversationMessages[0];
+        const isFriend = checkFriendStatus(partner.id) === 'connected';
+        
+        // Count unread messages
+        const unreadCount = conversationMessages.filter(
+          (msg: Message) => msg.sender_id === partner.id && !msg.read
+        ).length;
+        
+        return { 
+          ...partner, 
+          lastMessage, 
+          isFriend,
+          unreadCount
+        };
+      });
+      
+      // Sort conversations by latest message first
+      conversationsWithLastMessage.sort((a, b) => {
+        if (!a.lastMessage && !b.lastMessage) return 0;
+        if (!a.lastMessage) return 1;
+        if (!b.lastMessage) return -1;
+        return new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime();
+      });
+      
+      setConversations(conversationsWithLastMessage);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchConversations();
+    
+    // Subscribe to new messages
+    const subscription = supabase
+      .channel('messages-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'messages',
+        filter: `or(sender_id=eq.${user?.id},receiver_id=eq.${user?.id})`
+      }, () => {
+        // Refresh conversations when any message changes
+        fetchConversations();
+      })
+      .subscribe();
+      
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [user, checkFriendStatus]);
 
   // Fetch messages for selected conversation
-  useEffect(() => {
-    const fetchMessages = async () => {
-      if (!user || !selectedUser) return;
-      
-      setLoadingMessages(true);
-      
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser}),and(sender_id.eq.${selectedUser},receiver_id.eq.${user.id})`)
-          .order('created_at', { ascending: true });
+  const fetchMessages = async () => {
+    if (!user || !selectedUser) return;
+    
+    setLoadingMessages(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser}),and(sender_id.eq.${selectedUser},receiver_id.eq.${user.id})`)
+        .order('created_at', { ascending: true });
           
-        if (error) throw error;
-        
-        setMessages(data as Message[]);
-        
-        // Mark messages as read
+      if (error) throw error;
+      
+      setMessages(data as Message[]);
+      
+      // Mark messages as read
+      const unreadMessages = data.filter(msg => 
+        msg.sender_id === selectedUser && msg.receiver_id === user.id && !msg.read
+      );
+      
+      if (unreadMessages.length > 0) {
         await supabase
           .from('messages')
           .update({ read: true })
-          .match({ sender_id: selectedUser, receiver_id: user.id, read: false });
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-      } finally {
-        setLoadingMessages(false);
+          .in('id', unreadMessages.map(msg => msg.id));
+          
+        // Refresh conversations to update unread counts
+        fetchConversations();
       }
-    };
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
 
+  useEffect(() => {
     if (selectedUser) {
       fetchMessages();
-      
-      // Subscribe to new messages
-      const subscription = supabase
-        .channel('messages-channel')
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `or(and(sender_id=eq.${user?.id},receiver_id=eq.${selectedUser}),and(sender_id=eq.${selectedUser},receiver_id=eq.${user?.id}))`
-        }, payload => {
-          setMessages(prevMessages => [...prevMessages, payload.new as Message]);
-        })
-        .subscribe();
-        
-      return () => {
-        subscription.unsubscribe();
-      };
     }
   }, [user, selectedUser]);
 
@@ -187,17 +226,40 @@ export function MessagesList() {
         } else if (itemContext.type === 'lostfound') {
           messageData.lost_found_id = itemContext.id;
         }
-        // Clear item context after first message
-        setItemContext(null);
       }
       
-      const { error } = await supabase
+      // First add the message locally for instant UI update
+      const optimisticMessage: Message = {
+        ...messageData,
+        id: `temp-${Date.now()}`,
+        created_at: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, optimisticMessage]);
+      
+      // Clear the input field immediately
+      setNewMessage('');
+      
+      // Now send to the server
+      const { data, error } = await supabase
         .from('messages')
-        .insert([messageData]);
+        .insert([messageData])
+        .select()
+        .single();
         
       if (error) throw error;
       
-      setNewMessage('');
+      // Replace the optimistic message with the real one
+      setMessages(prev => 
+        prev.map(msg => msg.id === optimisticMessage.id ? data : msg)
+      );
+      
+      // Clear item context after first message
+      if (itemContext) setItemContext(null);
+      
+      // Refresh conversations list
+      fetchConversations();
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -235,6 +297,21 @@ export function MessagesList() {
         
         if (!contextMessage) return;
         
+        // Add optimistic first message
+        const optimisticMessage: Message = {
+          id: `temp-${Date.now()}`,
+          sender_id: user.id,
+          receiver_id: selectedUser,
+          content: contextMessage,
+          read: false,
+          created_at: new Date().toISOString(),
+          listing_id: itemType === 'listing' ? itemId : null,
+          lost_found_id: itemType === 'lostfound' ? itemId : null
+        };
+        
+        setMessages(prev => [...prev, optimisticMessage]);
+        
+        // Now send to the server
         const messageData: any = {
           sender_id: user.id,
           receiver_id: selectedUser,
@@ -249,10 +326,24 @@ export function MessagesList() {
           messageData.lost_found_id = itemId;
         }
         
-        await supabase.from('messages').insert([messageData]);
+        const { data, error } = await supabase
+          .from('messages')
+          .insert([messageData])
+          .select()
+          .single();
+          
+        if (error) throw error;
+        
+        // Replace the optimistic message with the real one
+        setMessages(prev => 
+          prev.map(msg => msg.id === optimisticMessage.id ? data : msg)
+        );
         
         // Clear context to avoid sending duplicates
         setItemContext(null);
+        
+        // Refresh conversations list
+        fetchConversations();
       } catch (error) {
         console.error('Error sending first message:', error);
       }
@@ -263,17 +354,6 @@ export function MessagesList() {
       sendFirstMessageWithContext();
     }
   }, [conversations, selectedUser, itemContext, user]);
-
-  // Get unread messages count for conversations
-  const getUnreadCount = (partnerId: string) => {
-    if (!user) return 0;
-    
-    const conversation = conversations.find(conv => conv.id === partnerId);
-    return conversation?.lastMessage?.read === false && 
-      conversation?.lastMessage?.sender_id === partnerId 
-      ? 1 
-      : 0;
-  };
 
   // Format time for messages
   const formatMessageTime = (timestamp: string) => {
@@ -309,51 +389,49 @@ export function MessagesList() {
               No conversations yet
             </div>
           ) : (
-            conversations.map(partner => {
-              const unreadCount = getUnreadCount(partner.id);
-              
-              return (
-                <div 
-                  key={partner.id} 
-                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedUser === partner.id ? 'bg-emerald-50' : ''
-                  } ${unreadCount > 0 ? 'bg-emerald-50/50' : ''}`}
-                  onClick={() => setSelectedUser(partner.id)}
-                >
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-medium relative">
-                      {partner.full_name?.[0] || '?'}
-                      {partner.isFriend && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
+            conversations.map(partner => (
+              <div 
+                key={partner.id} 
+                className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selectedUser === partner.id ? 'bg-emerald-50' : ''
+                } ${partner.unreadCount > 0 ? 'bg-emerald-50/50' : ''}`}
+                onClick={() => setSelectedUser(partner.id)}
+              >
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-medium relative">
+                    {partner.full_name?.[0] || '?'}
+                    {partner.isFriend && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white"></div>
+                    )}
+                  </div>
+                  <div className="ml-3 flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className={`font-medium text-gray-800 truncate ${partner.unreadCount > 0 ? 'font-bold' : ''}`}>
+                        {partner.full_name}
+                      </p>
+                      {partner.lastMessage && (
+                        <span className="text-xs text-gray-400 ml-2 shrink-0">
+                          {formatDistanceToNow(new Date(partner.lastMessage.created_at), { addSuffix: true })}
+                        </span>
                       )}
                     </div>
-                    <div className="ml-3 flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className={`font-medium text-gray-800 truncate ${unreadCount > 0 ? 'font-bold' : ''}`}>
-                          {partner.full_name}
-                        </p>
-                        {partner.lastMessage && (
-                          <span className="text-xs text-gray-400 ml-2 shrink-0">
-                            {formatDistanceToNow(new Date(partner.lastMessage.created_at), { addSuffix: true })}
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex justify-between items-center">
                       {partner.lastMessage && (
-                        <p className={`text-sm text-gray-500 truncate ${unreadCount > 0 ? 'font-medium' : ''}`}>
+                        <p className={`text-sm text-gray-500 truncate ${partner.unreadCount > 0 ? 'font-medium' : ''}`}>
                           {partner.lastMessage.sender_id === user?.id ? 'You: ' : ''}
                           {partner.lastMessage.content}
                         </p>
                       )}
-                      {unreadCount > 0 && (
-                        <span className="inline-block mt-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {unreadCount}
-                        </span>
+                      {partner.unreadCount > 0 && (
+                        <Badge className="ml-2 bg-red-500 hover:bg-red-600">
+                          {partner.unreadCount}
+                        </Badge>
                       )}
                     </div>
                   </div>
                 </div>
-              );
-            })
+              </div>
+            ))
           )}
         </div>
       </div>

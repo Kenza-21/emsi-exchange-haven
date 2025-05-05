@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { UserPlus, X, Check, Search, UserMinus, UserX } from 'lucide-react';
+import { UserPlus, X, Check, Search, UserMinus } from 'lucide-react';
 
 const FriendsPage = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { 
     friends,
     isLoading,
@@ -24,11 +24,12 @@ const FriendsPage = () => {
     setSearchQuery,
     searchUsers,
     searchResults,
-    isSearching
+    isSearching,
+    refetch
   } = useFriends();
   const [showSearch, setShowSearch] = useState(false);
   
-  if (loading) {
+  if (authLoading) {
     return <div className="container mx-auto py-8">Loading...</div>;
   }
   
@@ -51,8 +52,9 @@ const FriendsPage = () => {
           title: "Friend request sent",
           description: "Your friend request has been sent!"
         });
+        refetch();
       },
-      onError: (error) => {
+      onError: (error: any) => {
         toast({
           title: "Error",
           description: "Failed to send friend request: " + error.message,
@@ -69,8 +71,9 @@ const FriendsPage = () => {
           title: "Friend request accepted",
           description: "You are now friends!"
         });
+        refetch();
       },
-      onError: (error) => {
+      onError: (error: any) => {
         toast({
           title: "Error",
           description: "Failed to accept friend request: " + error.message,
@@ -87,8 +90,9 @@ const FriendsPage = () => {
           title: "Friend request rejected",
           description: "The friend request has been rejected."
         });
+        refetch();
       },
-      onError: (error) => {
+      onError: (error: any) => {
         toast({
           title: "Error",
           description: "Failed to reject friend request: " + error.message,
@@ -105,8 +109,9 @@ const FriendsPage = () => {
           title: "Friend request cancelled",
           description: "Your friend request has been cancelled."
         });
+        refetch();
       },
-      onError: (error) => {
+      onError: (error: any) => {
         toast({
           title: "Error",
           description: "Failed to cancel friend request: " + error.message,
@@ -123,8 +128,9 @@ const FriendsPage = () => {
           title: "Unfriended",
           description: "You have removed this friend."
         });
+        refetch();
       },
-      onError: (error) => {
+      onError: (error: any) => {
         toast({
           title: "Error",
           description: "Failed to unfriend: " + error.message,
@@ -141,6 +147,14 @@ const FriendsPage = () => {
       {error ? (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           Error loading friends: {error.message}
+          <Button 
+            onClick={() => refetch()} 
+            variant="outline" 
+            size="sm" 
+            className="ml-2"
+          >
+            Try Again
+          </Button>
         </div>
       ) : (
         <div className="space-y-8">
@@ -275,9 +289,7 @@ const FriendsPage = () => {
                     <CardContent className="p-4 flex justify-between items-center">
                       <div>
                         <h3 className="font-semibold">
-                          {friend.sender_id === user.id 
-                            ? friend.profile?.full_name
-                            : friend.profile?.full_name}
+                          {friend.profile?.full_name}
                         </h3>
                       </div>
                       <Button 

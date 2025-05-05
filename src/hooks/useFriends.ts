@@ -19,23 +19,23 @@ export function useFriends() {
     }
     
     try {
-      // Fetch sent friend requests with profile info of receiver
+      // Fetch sent friend requests
       const { data: sentRequests, error: sentError } = await supabase
         .from('friends')
         .select(`
           *,
-          profile:profiles!friends_receiver_id_fkey(*)
+          receiver:profiles!friends_receiver_id_fkey(id, full_name, student_id, bio)
         `)
         .eq('sender_id', user.id);
       
       if (sentError) throw sentError;
       
-      // Fetch received friend requests with profile info of sender
+      // Fetch received friend requests
       const { data: receivedRequests, error: receivedError } = await supabase
         .from('friends')
         .select(`
           *,
-          profile:profiles!friends_sender_id_fkey(*)
+          sender:profiles!friends_sender_id_fkey(id, full_name, student_id, bio)
         `)
         .eq('receiver_id', user.id);
       
@@ -50,7 +50,7 @@ export function useFriends() {
       sentRequests.forEach((request: any) => {
         const friend: FriendWithProfiles = {
           ...request,
-          profile: request.profile as Profile | null
+          profile: request.receiver
         };
         
         if (friend.status === 'accepted') {
@@ -64,7 +64,7 @@ export function useFriends() {
       receivedRequests.forEach((request: any) => {
         const friend: FriendWithProfiles = {
           ...request,
-          profile: request.profile as Profile | null
+          profile: request.sender
         };
         
         if (friend.status === 'accepted') {

@@ -37,7 +37,7 @@ const HomePage = () => {
               </Button>
             </Link>
             <Link to="/lost-found">
-              <Button variant="outline" className="border-white text-white hover:bg-emerald-700 w-full sm:w-auto">
+              <Button className="bg-white text-emerald-600 hover:bg-gray-100 w-full sm:w-auto">
                 Lost & Found
               </Button>
             </Link>

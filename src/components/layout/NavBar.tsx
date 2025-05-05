@@ -67,10 +67,6 @@ export function NavBar() {
                 <UserPlus className="h-5 w-5 mb-1" />
                 <span>Friends</span>
               </Link>
-              <Link to="/search" className="hover:text-emerald-100 flex flex-col items-center text-xs md:hidden">
-                <Search className="h-5 w-5 mb-1" />
-                <span>Search</span>
-              </Link>
               <Link to="/lost-found" className="hover:text-emerald-100 flex flex-col items-center text-xs">
                 <AlertCircle className="h-5 w-5 mb-1" />
                 <span>Lost & Found</span>
@@ -115,4 +111,4 @@ export function NavBar() {
       </div>
     </nav>
   );
-}
+};
