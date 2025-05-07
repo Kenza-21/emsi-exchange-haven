@@ -21,6 +21,14 @@ import ProfilePage from "./pages/ProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
+// Admin Components
+import { AdminProtectedRoute } from "./components/admin/AdminProtectedRoute";
+import { AdminLayout } from "./components/admin/AdminLayout";
+import { DashboardPanel } from "./components/admin/DashboardPanel";
+import { ListingsTable } from "./components/admin/ListingsTable";
+import { UsersTable } from "./components/admin/UsersTable";
+import { SettingsPanel } from "./components/admin/SettingsPanel";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -43,7 +51,18 @@ const App = () => (
               <Route path="/lost-found/:id" element={<LostFoundDetailsPage />} />
               <Route path="/lost-found/create" element={<CreateLostFoundPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/:userId" element={<ProfilePage />} />
               <Route path="*" element={<NotFound />} />
+            </Route>
+            
+            {/* Admin Routes */}
+            <Route element={<AdminProtectedRoute />}>
+              <Route element={<AdminLayout />}>
+                <Route path="/admin" element={<DashboardPanel />} />
+                <Route path="/admin/listings" element={<ListingsTable />} />
+                <Route path="/admin/users" element={<UsersTable />} />
+                <Route path="/admin/settings" element={<SettingsPanel />} />
+              </Route>
             </Route>
           </Routes>
         </AuthProvider>

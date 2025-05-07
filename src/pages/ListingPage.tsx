@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, UserPlus } from 'lucide-react';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useListing } from '@/hooks/useListing';
@@ -10,7 +11,9 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { useFriends } from '@/hooks/useFriends';
+import { RatingForm } from '@/components/ratings/RatingForm';
+import { useTransactionParticipants, useHasRated } from '@/hooks/useRatings';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const ListingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,24 +23,111 @@ const ListingPage = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const { checkFriendStatus, sendFriendRequest } = useFriends();
-  const [friendStatus, setFriendStatus] = useState<string | null>(null);
-  const [isCheckingFriend, setIsCheckingFriend] = useState(false);
+  const [showRatingForm, setShowRatingForm] = useState(false);
   
-  useEffect(() => {
-    const loadFriendStatus = async () => {
-      if (!user || !seller) return;
+  const queryClient = useQueryClient();
+  const listingId = id || '';
+  
+  // Check if transaction exists for this listing
+  const { data: transaction } = useTransactionParticipants(listingId);
+  
+  // Check if the current user has already rated the seller for this listing
+  const { data: hasRated } = useHasRated(
+    user?.id || '', 
+    seller?.id || '', 
+    listingId
+  );
+  
+  // Determine if the user can rate the seller
+  const canRate = user && 
+    seller && 
+    user.id !== seller.id && 
+    transaction && 
+    (transaction.buyer_id === user.id || transaction.seller_id === user.id) &&
+    transaction.status === 'completed' && 
+    !hasRated;
+  
+  // Create a mutation to update a transaction to "completed" status
+  const markCompleted = useMutation({
+    mutationFn: async () => {
+      if (!user || !listing) return null;
       
-      setIsCheckingFriend(true);
-      const status = checkFriendStatus(seller.id);
-      setFriendStatus(status);
-      setIsCheckingFriend(false);
-    };
-    
-    if (seller && user && seller.id !== user.id) {
-      loadFriendStatus();
+      const { error, data } = await supabase
+        .from('transactions')
+        .update({ status: 'completed' })
+        .eq('listing_id', listing.id)
+        .eq('seller_id', listing.user_id)
+        .eq('buyer_id', user.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      // Update listing status to "sold"
+      return supabase
+        .from('listings')
+        .update({ status: 'sold' })
+        .eq('id', listingId)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['listing', listingId] });
+          toast({
+            title: 'Transaction Completed',
+            description: 'You can now leave a rating for the seller.'
+          });
+        });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
-  }, [user, seller, checkFriendStatus]);
+  });
+  
+  // Create a new transaction mutation
+  const createTransaction = useMutation({
+    mutationFn: async () => {
+      if (!user || !listing) return null;
+      
+      const { error, data } = await supabase
+        .from('transactions')
+        .insert({
+          listing_id: listing.id,
+          seller_id: listing.user_id,
+          buyer_id: user.id,
+          status: 'pending'
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Transaction Created',
+        description: 'Transaction has been initiated.'
+      });
+      queryClient.invalidateQueries({ queryKey: ['transaction-participants', listingId] });
+    },
+    onError: (error: any) => {
+      if (error.code === '23505') { // Unique violation
+        toast({
+          title: 'Transaction Exists',
+          description: 'You already have a pending transaction for this listing.'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive'
+        });
+      }
+    }
+  });
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,25 +165,35 @@ const ListingPage = () => {
       setIsSending(false);
     }
   };
-  
-  const handleSendFriendRequest = () => {
-    if (!seller) return;
+
+  // Handle buy/interest button click
+  const handleBuyInterest = () => {
+    if (!user || !listing) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to perform this action",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    sendFriendRequest.mutate(seller.id, {
-      onSuccess: () => {
-        toast({
-          title: "Friend request sent",
-          description: `Friend request sent to ${seller.full_name}`,
-        });
-        setFriendStatus('sent');
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to send friend request",
-          variant: "destructive",
-        });
-      }
+    createTransaction.mutate();
+  };
+  
+  // Handle completing a transaction
+  const handleCompleteTransaction = () => {
+    if (window.confirm("Are you sure you want to mark this transaction as completed? This will update the listing status to 'Sold'.")) {
+      markCompleted.mutate();
+    }
+  };
+  
+  // Handle closing the rating form
+  const handleRatingSuccess = () => {
+    setShowRatingForm(false);
+    queryClient.invalidateQueries({ queryKey: ['has-rated', user?.id, seller?.id, listingId] });
+    toast({
+      title: "Rating Submitted",
+      description: "Thank you for your feedback!"
     });
   };
 
@@ -126,41 +226,6 @@ const ListingPage = () => {
       </div>
     );
   }
-
-  const renderFriendButton = () => {
-    if (!user || user.id === seller?.id || isCheckingFriend) return null;
-    
-    if (friendStatus === 'connected') {
-      return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-          Friends
-        </Badge>
-      );
-    } else if (friendStatus === 'sent') {
-      return (
-        <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-          Friend Request Sent
-        </Badge>
-      );
-    } else if (friendStatus === 'received') {
-      return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-          Friend Request Received
-        </Badge>
-      );
-    }
-    
-    return (
-      <Button 
-        onClick={handleSendFriendRequest} 
-        variant="outline"
-        className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
-      >
-        <UserPlus className="h-4 w-4 mr-2" />
-        Add Friend
-      </Button>
-    );
-  };
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -209,6 +274,18 @@ const ListingPage = () => {
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Description</h2>
             <p className="text-gray-700 whitespace-pre-line">{listing.description}</p>
           </div>
+          
+          {/* Rating Form */}
+          {showRatingForm && seller && (
+            <div className="mt-8">
+              <RatingForm 
+                toUserId={seller.id} 
+                itemId={listing.id} 
+                onSuccess={handleRatingSuccess} 
+                onCancel={() => setShowRatingForm(false)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Listing details */}
@@ -234,28 +311,71 @@ const ListingPage = () => {
               
               <div className="border-t border-gray-200 my-4 pt-4">
                 <h3 className="font-medium text-gray-700 mb-2">Seller</h3>
-                <div className="flex items-center">
+                <Link to={`/profile/${seller?.id}`} className="flex items-center">
                   <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
                     {seller?.full_name?.[0] || '?'}
                   </div>
                   <span className="ml-3 font-medium">{seller?.full_name}</span>
-                </div>
+                </Link>
               </div>
 
               {/* Actions */}
               <div className="mt-6 space-y-2">
                 {user && user.id !== listing.user_id ? (
                   <>
-                    <Button 
-                      onClick={() => setIsMessageModalOpen(true)} 
-                      className="w-full bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Contact Seller
-                    </Button>
-                    <div className="flex justify-center">
-                      {renderFriendButton()}
-                    </div>
+                    {listing.status === 'sold' ? (
+                      <Button 
+                        disabled
+                        className="w-full bg-gray-300 text-gray-700 cursor-not-allowed"
+                      >
+                        This item has been sold
+                      </Button>
+                    ) : (
+                      <>
+                        <Button 
+                          onClick={() => setIsMessageModalOpen(true)} 
+                          className="w-full bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Contact Seller
+                        </Button>
+                        
+                        {transaction ? (
+                          transaction.status === 'pending' && transaction.buyer_id === user.id ? (
+                            <Button 
+                              onClick={handleCompleteTransaction}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700"
+                            >
+                              Complete Transaction
+                            </Button>
+                          ) : transaction.status === 'completed' ? (
+                            hasRated ? (
+                              <Button 
+                                disabled
+                                className="w-full bg-gray-300 text-gray-700"
+                              >
+                                You've already rated this seller
+                              </Button>
+                            ) : (
+                              <Button 
+                                onClick={() => setShowRatingForm(true)}
+                                className="w-full bg-yellow-500 hover:bg-yellow-600"
+                              >
+                                Rate Seller
+                              </Button>
+                            )
+                          ) : null
+                        ) : (
+                          <Button 
+                            onClick={handleBuyInterest}
+                            disabled={createTransaction.isPending}
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                          >
+                            {createTransaction.isPending ? 'Processing...' : 'I want to buy this'}
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </>
                 ) : user && user.id === listing.user_id ? (
                   <div className="space-y-2">

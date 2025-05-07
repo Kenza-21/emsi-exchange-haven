@@ -5,6 +5,7 @@ export type Profile = {
   student_id: string | null;
   created_at: string;
   bio?: string | null;
+  is_blocked?: boolean | null;
 };
 
 export type Listing = {
@@ -69,6 +70,32 @@ export type Post = {
   profile?: {
     full_name: string;
   };
+};
+
+export type Rating = {
+  id: string;
+  item_id: string | null;
+  from_user_id: string;
+  to_user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
+export type Transaction = {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminUser = {
+  id: string;
+  is_admin: boolean;
+  created_at: string;
 };
 
 export const CATEGORIES = [
