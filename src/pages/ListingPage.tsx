@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MessageSquare, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useListing } from '@/hooks/useListing';
@@ -11,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ShareQRCode } from '@/components/listings/ShareQRCode';
+import { useFriends } from '@/hooks/useFriends';
 
 const ListingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +20,24 @@ const ListingPage = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const { checkFriendStatus, sendFriendRequest } = useFriends();
+  const [friendStatus, setFriendStatus] = useState<string | null>(null);
+  const [isCheckingFriend, setIsCheckingFriend] = useState(false);
+  
+  useEffect(() => {
+    const loadFriendStatus = async () => {
+      if (!user || !seller) return;
+      
+      setIsCheckingFriend(true);
+      const status = checkFriendStatus(seller.id);
+      setFriendStatus(status);
+      setIsCheckingFriend(false);
+    };
+    
+    if (seller && user && seller.id !== user.id) {
+      loadFriendStatus();
+    }
+  }, [user, seller, checkFriendStatus]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +75,27 @@ const ListingPage = () => {
       setIsSending(false);
     }
   };
+  
+  const handleSendFriendRequest = () => {
+    if (!seller) return;
+    
+    sendFriendRequest.mutate(seller.id, {
+      onSuccess: () => {
+        toast({
+          title: "Friend request sent",
+          description: `Friend request sent to ${seller.full_name}`,
+        });
+        setFriendStatus('sent');
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to send friend request",
+          variant: "destructive",
+        });
+      }
+    });
+  };
 
   if (loading) {
     return (
@@ -88,6 +126,41 @@ const ListingPage = () => {
       </div>
     );
   }
+
+  const renderFriendButton = () => {
+    if (!user || user.id === seller?.id || isCheckingFriend) return null;
+    
+    if (friendStatus === 'connected') {
+      return (
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+          Friends
+        </Badge>
+      );
+    } else if (friendStatus === 'sent') {
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+          Friend Request Sent
+        </Badge>
+      );
+    } else if (friendStatus === 'received') {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+          Friend Request Received
+        </Badge>
+      );
+    }
+    
+    return (
+      <Button 
+        onClick={handleSendFriendRequest} 
+        variant="outline"
+        className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+      >
+        <UserPlus className="h-4 w-4 mr-2" />
+        Add Friend
+      </Button>
+    );
+  };
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -180,8 +253,8 @@ const ListingPage = () => {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Seller
                     </Button>
-                    <div className="flex justify-center w-full">
-                      <ShareQRCode listingId={listing.id} title={listing.title} />
+                    <div className="flex justify-center">
+                      {renderFriendButton()}
                     </div>
                   </>
                 ) : user && user.id === listing.user_id ? (
@@ -192,17 +265,13 @@ const ListingPage = () => {
                     >
                       This is your listing
                     </Button>
-                    <ShareQRCode listingId={listing.id} title={listing.title} />
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Link to="/login" className="block w-full">
-                      <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
-                        Sign in to contact seller
-                      </Button>
-                    </Link>
-                    <ShareQRCode listingId={listing.id} title={listing.title} />
-                  </div>
+                  <Link to="/login">
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
+                      Sign in to contact seller
+                    </Button>
+                  </Link>
                 )}
               </div>
             </CardContent>

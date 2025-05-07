@@ -21,10 +21,6 @@ import ProfilePage from "./pages/ProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
-// Admin
-import { AdminLayout } from "./components/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/DashboardPage";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -48,11 +44,6 @@ const App = () => (
               <Route path="/lost-found/create" element={<CreateLostFoundPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="*" element={<NotFound />} />
-            </Route>
-            
-            {/* Admin Routes */}
-            <Route element={<AdminLayout />}>
-              <Route path="/admin" element={<AdminDashboard />} />
             </Route>
           </Routes>
         </AuthProvider>
