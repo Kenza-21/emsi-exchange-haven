@@ -296,7 +296,7 @@ const FriendsPage = () => {
                         size="sm" 
                         variant="outline"
                         className="text-gray-600 hover:text-red-600"
-                        onClick={() => handleUnfriend(friend.id)}
+                        onClick={() => handleUnfriend(friend.from_user_id === user.id ? friend.to_user_id : friend.from_user_id)}
                       >
                         <UserMinus className="h-4 w-4 mr-1" />
                         Unfriend
