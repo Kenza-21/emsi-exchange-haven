@@ -71,6 +71,32 @@ export type Post = {
   };
 };
 
+export type Transaction = {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type Rating = {
+  id: string;
+  transaction_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
+export type AdminUser = Profile & {
+  is_admin: boolean;
+  is_blocked: boolean;
+  email?: string;
+};
+
 export const CATEGORIES = [
   'School Supplies',
   'Textbooks',
