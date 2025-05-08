@@ -25,7 +25,7 @@ export function useMessages() {
     
     try {
       // Get all messages where current user is either sender or receiver
-      const { data, error: messagesError } = await supabase
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
         .select(`
           *,
@@ -38,7 +38,7 @@ export function useMessages() {
       if (messagesError) throw messagesError;
       
       // Group messages by conversation
-      const newMessages = data as MessageWithProfile[];
+      const newMessages = messagesData as MessageWithProfile[];
       setMessages(newMessages);
       
       // Count unread messages where current user is the receiver

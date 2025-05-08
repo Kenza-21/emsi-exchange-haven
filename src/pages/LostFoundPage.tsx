@@ -1,61 +1,58 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LostFound, Profile } from '@/types/database';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRightCircle, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/context/AuthContext';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
-import { Input } from "@/components/ui/input";
-import { Search, Trash2 } from "lucide-react";
+import { LostFound } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
-interface LostFoundWithUser extends LostFound {
-  user_profile?: Profile;
-}
+import { useAuth } from '@/context/AuthContext';
 
 const LostFoundPage = () => {
-  const [items, setItems] = useState<LostFoundWithUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
-
-  useEffect(() => {
-    const fetchLostFoundItems = async () => {
-      setLoading(true);
-      setError(null);
+  const [items, setItems] = useState<(LostFound & { user_name?: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'found' | 'lost'>('all');
+  
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('lost_found')
+        .select(`
+          *,
+          user_profile:profiles(full_name)
+        `)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
       
-      try {
-        let query = supabase
-          .from('lost_found')
-          .select(`
-            *,
-            user_profile:profiles(*)
-          `)
-          .order('created_at', { ascending: false });
-        
-        if (searchQuery) {
-          query = query.ilike('title', `%${searchQuery}%`);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        
-        setItems(data as LostFoundWithUser[]);
-      } catch (err: any) {
-        console.error('Error fetching lost & found items:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLostFoundItems();
+      // Format data to include user name
+      const formattedData = (data || []).map((item: any) => ({
+        ...item,
+        user_name: item.user_profile?.full_name
+      }));
+      
+      setItems(formattedData);
+    } catch (error) {
+      console.error('Error fetching lost & found items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load lost & found items",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchItems();
     
     // Subscribe to changes
     const subscription = supabase
@@ -63,223 +60,187 @@ const LostFoundPage = () => {
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'lost_found' 
+        table: 'lost_found'
       }, () => {
-        fetchLostFoundItems();
+        fetchItems();
       })
       .subscribe();
       
     return () => {
       subscription.unsubscribe();
     };
-  }, [searchQuery]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // The searchQuery state will trigger the useEffect
+  }, []);
+  
+  // Filter items based on search query and status
+  const filteredItems = items.filter(item => {
+    const matchesSearch = 
+      !searchQuery.trim() || 
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.location && item.location.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesStatus = 
+      statusFilter === 'all' || 
+      item.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+  
+  const handleStatusFilter = (status: 'all' | 'found' | 'lost') => {
+    setStatusFilter(status);
   };
-
+  
   const handleDelete = async (itemId: string) => {
     if (!user) return;
-    setIsDeleting(true);
     
     try {
-      // Find the item to get the image URL
-      const itemToRemove = items.find(item => item.id === itemId);
-
-      // Remove image from storage if it exists
-      if (itemToRemove?.image_url) {
-        const imageUrlParts = itemToRemove.image_url.split('/');
-        const filePathIndex = imageUrlParts.findIndex(part => part === 'lost-found-images');
-        
-        if (filePathIndex !== -1) {
-          // Extract the path after 'lost-found-images/'
-          const storagePath = imageUrlParts.slice(filePathIndex + 1).join('/');
-          
-          // Delete the image from storage
-          await supabase
-            .storage
-            .from('lost-found-images')
-            .remove([storagePath]);
-        }
-      }
-      
-      // Delete item from database - FIXED: This should actually remove the item
       const { error } = await supabase
         .from('lost_found')
         .delete()
         .eq('id', itemId)
-        .eq('user_id', user.id); // Ensure user can only delete their own items
+        .eq('user_id', user.id);
       
       if (error) throw error;
       
-      // Optimistically remove the item from the UI - FIXED: This ensures the deleted item is removed from the state immediately
+      // Update local state - remove the deleted item
       setItems(prevItems => prevItems.filter(item => item.id !== itemId));
       
       toast({
-        title: "Item Deleted",
-        description: "The item has been successfully deleted."
+        title: "Success",
+        description: "Item was successfully deleted",
       });
-    } catch (err: any) {
-      console.error('Error deleting item:', err);
+    } catch (error: any) {
+      console.error('Error deleting item:', error);
       toast({
         title: "Error",
-        description: err.message || "Failed to delete the item.",
+        description: error.message || "Failed to delete item",
         variant: "destructive"
       });
-    } finally {
-      setIsDeleting(false);
-      setItemToDelete(null); // Reset item to delete
     }
   };
-
+  
   return (
     <div className="container mx-auto py-8 px-4">
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Lost & Found</h1>
+      <div className="flex flex-col md:flex-row items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-gray-800 mb-4 md:mb-0">Lost & Found</h1>
         
-        {user && (
-          <Link to="/lost-found/create">
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Report Item
-            </Button>
-          </Link>
-        )}
-      </div>
-      
-      <div className="mb-8">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <Input
-              type="text"
-              placeholder="Search for lost & found items..."
+              placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full sm:w-64"
             />
           </div>
-          <Button type="submit" className="bg-gray-800 hover:bg-gray-900">
-            Search
-          </Button>
-        </form>
+          
+          <div className="flex space-x-2">
+            <Button 
+              variant={statusFilter === 'all' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => handleStatusFilter('all')}
+            >
+              All
+            </Button>
+            <Button 
+              variant={statusFilter === 'found' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => handleStatusFilter('found')}
+            >
+              Found Items
+            </Button>
+            <Button 
+              variant={statusFilter === 'lost' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => handleStatusFilter('lost')}
+            >
+              Lost Items
+            </Button>
+          </div>
+          
+          <Link to="/lost-found/create">
+            <Button className="w-full sm:w-auto">
+              <Plus size={18} className="mr-2" /> Report Item
+            </Button>
+          </Link>
+        </div>
       </div>
       
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="flex flex-col animate-pulse">
-              <div className="h-48 bg-gray-200 rounded-t-lg" />
-              <CardContent className="py-4">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-gray-200 rounded w-1/2" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex justify-center items-center h-64">
+          <p>Loading items...</p>
         </div>
-      ) : error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          Failed to load lost & found items: {error}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-lg text-gray-600 mb-4">No lost & found items available</p>
+      ) : filteredItems.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No items found.</p>
+          <Link to="/lost-found/create" className="text-emerald-600 hover:underline mt-2 block">
+            Report a lost or found item
+          </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {items.map(item => (
-            <Card key={item.id} className="flex flex-col overflow-hidden">
-              <div className="h-48 bg-gray-100 relative">
-                {item.image_url ? (
-                  <img 
-                    src={item.image_url} 
-                    alt={item.title}
-                    className="w-full h-full object-cover" 
-                    onError={(e) => {
-                      // Fallback if image fails to load
-                      (e.target as HTMLImageElement).src = '/placeholder.svg';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    No image
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredItems.map(item => (
+            <Card key={item.id} className="h-full flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <Badge className={`mb-2 ${item.status === 'found' ? 'bg-emerald-500' : 'bg-amber-500'}`}>
+                      {item.status === 'found' ? 'Found Item' : 'Lost Item'}
+                    </Badge>
+                    <h3 className="text-lg font-semibold">{item.title}</h3>
                   </div>
-                )}
-                <span className={`absolute top-2 right-2 text-xs px-2 py-1 rounded ${
-                  item.status === 'lost' 
-                    ? 'bg-red-500 text-white' 
-                    : 'bg-emerald-500 text-white'
-                }`}>
-                  {item.status}
-                </span>
-              </div>
-              
-              <CardHeader>
-                <CardTitle className="line-clamp-1">{item.title}</CardTitle>
+                </div>
               </CardHeader>
               
               <CardContent className="flex-grow">
+                {item.image_url && (
+                  <div className="mb-4 rounded-md overflow-hidden aspect-video">
+                    <img 
+                      src={item.image_url} 
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                
                 {item.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                    {item.description}
-                  </p>
+                  <p className="text-gray-600 text-sm line-clamp-3 mb-2">{item.description}</p>
                 )}
                 
                 {item.location && (
-                  <p className="text-sm text-gray-500 mb-1">
+                  <p className="text-gray-600 text-sm">
                     <span className="font-medium">Location:</span> {item.location}
                   </p>
                 )}
                 
-                <p className="text-sm text-gray-500">
-                  <span className="font-medium">Found:</span> {new Date(item.found_date).toLocaleDateString()}
+                <p className="text-gray-500 text-xs mt-2">
+                  {item.found_date && `${item.status === 'found' ? 'Found' : 'Lost'} on ${new Date(item.found_date).toLocaleDateString()}`}
                 </p>
                 
-                <p className="text-xs text-gray-400 mt-2">
-                  Posted by {item.user_profile?.full_name || 'Unknown'} {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                <p className="text-gray-500 text-xs mt-1">
+                  Posted {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                  {item.user_name && ` by ${item.user_name}`}
                 </p>
               </CardContent>
               
-              <CardFooter className="border-t bg-gray-50 p-3 flex justify-between">
-                <Link to={`/lost-found/${item.id}`} className="flex-1 mr-2">
-                  <Button variant="outline" className="w-full">View Details</Button>
+              <CardFooter className="flex justify-between pt-3 border-t">
+                <Link 
+                  to={`/lost-found/${item.id}`}
+                  className="text-emerald-600 hover:text-emerald-700 text-sm font-medium flex items-center"
+                >
+                  View Details
+                  <ArrowRightCircle size={16} className="ml-1" />
                 </Link>
                 
-                {user && user.id === item.user_id && (
-                  <AlertDialog open={itemToDelete === item.id} onOpenChange={(open) => {
-                    if (!open) setItemToDelete(null);
-                  }}>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        className="border-red-200 hover:bg-red-50 hover:text-red-600"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setItemToDelete(item.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Item</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete this item? This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-red-500 hover:bg-red-600"
-                          onClick={() => handleDelete(item.id)}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? 'Deleting...' : 'Delete'}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                {user?.id === item.user_id && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => handleDelete(item.id)}
+                  >
+                    Delete
+                  </Button>
                 )}
               </CardFooter>
             </Card>
