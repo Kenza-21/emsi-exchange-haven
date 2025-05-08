@@ -9,33 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      friend_requests: {
-        Row: {
-          created_at: string
-          from_user_id: string
-          id: string
-          status: string
-          to_user_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          from_user_id: string
-          id?: string
-          status?: string
-          to_user_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          from_user_id?: string
-          id?: string
-          status?: string
-          to_user_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       images: {
         Row: {
           created_at: string
@@ -241,33 +214,6 @@ export type Database = {
           read?: boolean | null
           related_id?: string | null
           type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      posts: {
-        Row: {
-          content: string
-          created_at: string
-          id: string
-          image_url: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          updated_at?: string
           user_id?: string
         }
         Relationships: []

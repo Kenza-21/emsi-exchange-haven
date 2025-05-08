@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,18 +10,32 @@ import {
   PlusCircle,
   User,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  Shield
 } from 'lucide-react';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Input } from '@/components/ui/input';
 import { useMessages } from '@/hooks/useMessages';
+import { isAdmin } from '@/lib/auth-helpers';
 
 export function NavBar() {
   const { user, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [adminStatus, setAdminStatus] = useState(false);
   const navigate = useNavigate();
   // Use the useMessages hook to get unreadCount for the message badge
   const { unreadCount: messageUnreadCount } = useMessages();
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        const adminCheck = await isAdmin();
+        setAdminStatus(adminCheck);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +100,12 @@ export function NavBar() {
                 <User className="h-5 w-5 mb-1" />
                 <span>Profile</span>
               </Link>
+              {adminStatus && (
+                <Link to="/admin" className="hover:text-emerald-100 flex flex-col items-center text-xs">
+                  <Shield className="h-5 w-5 mb-1" />
+                  <span>Admin</span>
+                </Link>
+              )}
               <div className="hover:text-emerald-100 flex flex-col items-center text-xs">
                 <NotificationsDropdown />
                 <span>Alerts</span>
