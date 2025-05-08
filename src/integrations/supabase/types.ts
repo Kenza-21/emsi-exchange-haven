@@ -9,24 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      admin_users: {
-        Row: {
-          created_at: string
-          id: string
-          is_admin: boolean
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          is_admin?: boolean
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_admin?: boolean
-        }
-        Relationships: []
-      }
       friend_requests: {
         Row: {
           created_at: string
@@ -296,7 +278,6 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
-          is_blocked: boolean | null
           student_id: string | null
         }
         Insert: {
@@ -304,7 +285,6 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
-          is_blocked?: boolean | null
           student_id?: string | null
         }
         Update: {
@@ -312,96 +292,16 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
-          is_blocked?: boolean | null
           student_id?: string | null
         }
         Relationships: []
-      }
-      ratings: {
-        Row: {
-          comment: string | null
-          created_at: string
-          from_user_id: string
-          id: string
-          item_id: string | null
-          rating: number
-          to_user_id: string
-        }
-        Insert: {
-          comment?: string | null
-          created_at?: string
-          from_user_id: string
-          id?: string
-          item_id?: string | null
-          rating: number
-          to_user_id: string
-        }
-        Update: {
-          comment?: string | null
-          created_at?: string
-          from_user_id?: string
-          id?: string
-          item_id?: string | null
-          rating?: number
-          to_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ratings_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      transactions: {
-        Row: {
-          buyer_id: string
-          created_at: string
-          id: string
-          listing_id: string
-          seller_id: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          buyer_id: string
-          created_at?: string
-          id?: string
-          listing_id: string
-          seller_id: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          buyer_id?: string
-          created_at?: string
-          id?: string
-          listing_id?: string
-          seller_id?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "transactions_listing_id_fkey"
-            columns: ["listing_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

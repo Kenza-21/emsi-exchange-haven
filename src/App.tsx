@@ -19,7 +19,6 @@ import LostFoundDetailsPage from "./pages/LostFoundDetailsPage";
 import CreateLostFoundPage from "./pages/CreateLostFoundPage";
 import ProfilePage from "./pages/ProfilePage";
 import DashboardPage from "./pages/DashboardPage";
-import FriendsPage from "./pages/FriendsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,7 +43,6 @@ const App = () => (
               <Route path="/lost-found/:id" element={<LostFoundDetailsPage />} />
               <Route path="/lost-found/create" element={<CreateLostFoundPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/friends" element={<FriendsPage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

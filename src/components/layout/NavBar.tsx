@@ -14,11 +14,14 @@ import {
 } from 'lucide-react';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Input } from '@/components/ui/input';
+import { useMessages } from '@/hooks/useMessages';
 
 export function NavBar() {
   const { user, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  // Use the useMessages hook to get unreadCount for the message badge
+  const { unreadCount: messageUnreadCount } = useMessages();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,8 +65,13 @@ export function NavBar() {
                 <Search className="h-5 w-5 mb-1" />
                 <span>Dashboard</span>
               </Link>
-              <Link to="/messages" className="hover:text-emerald-100 flex flex-col items-center text-xs">
+              <Link to="/messages" className="hover:text-emerald-100 flex flex-col items-center text-xs relative">
                 <MessageSquare className="h-5 w-5 mb-1" />
+                {messageUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                    {messageUnreadCount}
+                  </span>
+                )}
                 <span>Messages</span>
               </Link>
               <Link to="/lost-found" className="hover:text-emerald-100 flex flex-col items-center text-xs">

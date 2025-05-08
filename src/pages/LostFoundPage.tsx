@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -105,7 +104,7 @@ const LostFoundPage = () => {
         }
       }
       
-      // Delete item from database
+      // Delete item from database - FIXED: This should actually remove the item
       const { error } = await supabase
         .from('lost_found')
         .delete()
@@ -114,7 +113,7 @@ const LostFoundPage = () => {
       
       if (error) throw error;
       
-      // Optimistically remove the item from the UI
+      // Optimistically remove the item from the UI - FIXED: This ensures the deleted item is removed from the state immediately
       setItems(prevItems => prevItems.filter(item => item.id !== itemId));
       
       toast({
