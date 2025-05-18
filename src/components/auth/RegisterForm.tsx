@@ -58,7 +58,7 @@ export function RegisterForm() {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl text-gray-800">Create Account</CardTitle>
-        <CardDescription>Register a new EMSIExchangeHub account</CardDescription>
+        <CardDescription>Register a new EMSIExchange account</CardDescription>
       </CardHeader>
       <CardContent>
         {error && (
