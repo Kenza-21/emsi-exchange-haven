@@ -48,7 +48,7 @@ export function NavBar() {
     <nav className="bg-emerald-600 text-white shadow-md py-2 px-4">
       <div className="container mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2">
-          <span className="text-xl font-bold">EMSIExchangeHub</span>
+          <span className="text-xl font-bold">EMSIExchange</span>
         </Link>
         
         {user && (
