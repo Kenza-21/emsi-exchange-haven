@@ -25,7 +25,7 @@ const HomePage = () => {
       <div className="bg-emerald-600 text-white rounded-lg p-8 mb-8">
         <div className="max-w-2xl">
           <h1 className="text-3xl md:text-4xl font-bold mb-4">
-            EMSI Exchange Hub
+            EMSI Exchange 
           </h1>
           <p className="text-lg mb-6">
             Buy and sell items with fellow EMSI students. From textbooks to electronics, find everything you need on campus.
