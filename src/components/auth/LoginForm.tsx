@@ -30,7 +30,7 @@ export function LoginForm() {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl text-gray-800">Welcome Back</CardTitle>
-        <CardDescription>Sign in to your EMSIExchangeHub account</CardDescription>
+        <CardDescription>Sign in to your EMSIExchange account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
